@@ -1,0 +1,145 @@
+@page "/qlkho/thong-tin-don-vi-tinh"
+
+@using Microsoft.AspNetCore.Components.Authorization
+@inject QLKHOContext db
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <Inline @ref=@inline TItem="DonViTinh" TableTitle="đơn vị tính" query=@query
+            OnCreate="(data => Create((DonViTinh)data))" OnUpdate="(data => Update((DonViTinh)data))"
+            OnDelete="(data => Delete((DonViTinh)data))">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="DonViTinh" Sortable="false" Title="Tên đơn vị tính" Width="640px"
+                    TextAlign="TextAlign.Left" Property="TenDVT">
+                    <EditTemplate Context="ctx">
+                        <RadzenTextBox @bind-Value=@ctx.TenDVT Style="width: 100%" Placeholder="Tên đơn vị tính" />
+                    </EditTemplate>
+                </RadzenDataGridColumn>
+                <RadzenDataGridColumn TItem="DonViTinh" Sortable="false" Title="Thay đổi thứ tự" Width="80px"
+                    TextAlign="TextAlign.Center">
+                    <Template Context="ctx">
+                        <RadzenButton Size="ButtonSize.ExtraSmall" Icon="south" Click="@(() => SortSTT(ctx,"down"))" />
+                        <RadzenButton Size="ButtonSize.ExtraSmall" Icon="north" Click="@(() => SortSTT(ctx,"up"))" />
+                    </Template>
+                </RadzenDataGridColumn>
+            </MoreColumns>
+        </Inline>
+</Authorized>
+</AuthorizeView>
+
+@code {
+    IQueryable<DonViTinh> query = default!;
+
+    Inline<DonViTinh> inline = default!;
+
+    protected override void OnInitialized()
+    {
+        query = db.DonViTinhs.OrderBy(x => x.STT).AsQueryable() ?? Enumerable.Empty<DonViTinh>().AsQueryable();
+    }
+
+    protected async Task Create(DonViTinh record)
+    {
+        try
+        {
+            // Nếu AddRow() đã gán STT, không cần (và không nên) tính lại
+            if (record.STT == 0)
+            {
+                var orderedStt = await db.DonViTinhs
+                                        .OrderBy(x => x.STT)
+                                        .Select(x => x.STT)
+                                        .ToListAsync();
+
+                int nextStt = 1;
+                foreach (var s in orderedStt)
+                {
+                    if (s == nextStt) nextStt++;
+                    else if (s > nextStt) break;
+                }
+                record.STT = nextStt;
+            }
+            db.DonViTinhs.Add(record);
+            await db.SaveChangesAsync();
+            
+            notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_DonViTinh_TenDVT_Norm") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Trùng tên", "Đơn vị tính này đã tồn tại!", 4000);
+            db.Entry(record).State = EntityState.Detached;      // gỡ khỏi DbContext
+            await inline.CancelEdit(record);                    // thoát edit/insert
+            return;
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: -1);
+            db.Entry(record).State = EntityState.Detached;      // gỡ khỏi DbContext
+            await inline.CancelEdit(record);                    // thoát edit/insert
+        }
+        
+        await inline.ReloadTable(); 
+    }
+    protected async Task Update(DonViTinh record)
+    {
+        try
+        {
+            db.DonViTinhs.Update(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: -1);
+        }
+    }
+    protected async Task Delete(DonViTinh record)
+    {
+        try
+        {
+            db.DonViTinhs.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", "Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu", duration: -1);
+        }
+    }
+    protected async Task SortSTT(DonViTinh record, string typeSort)
+    {
+        DonViTinh near = new DonViTinh();
+        if (typeSort == "up")
+        {
+            near = await db.DonViTinhs.OrderBy(item => -item.STT).Where(item => item.STT <
+            record.STT).FirstOrDefaultAsync() ?? new DonViTinh();
+
+        }
+        if (typeSort == "down")
+        {
+            near = await db.DonViTinhs.OrderBy(item => item.STT).Where(item => item.STT >
+            record.STT).FirstOrDefaultAsync() ?? new DonViTinh();
+
+        }
+        if (near.MaDVT != 0)
+        {
+            int temp = record.STT;
+            record.STT = near.STT;
+            near.STT = temp;
+            List<DonViTinh> listUpdate = new List<DonViTinh>() { record, near };
+            db.DonViTinhs.UpdateRange(listUpdate);
+            await db.SaveChangesAsync();
+
+            // Cập nhật lại truy vấn với thứ tự mới
+            query = db.DonViTinhs.OrderBy(x => x.STT).AsQueryable();
+
+            // Tải lại bảng
+            await inline.ReloadTable();
+
+            // Cập nhật lại giao diện
+            StateHasChanged();
+        }
+    }
+}

@@ -1,0 +1,90 @@
+@page "/qlkho/thong-tin-nha-cung-cap"
+
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <Table TItem="NhaCungCap" TableTitle=@title query=@query
+            OnDelete="@(args => Delete((NhaCungCap)args))" OnSearch="@(args => SearchVoid((string)args))"
+            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh"
+            AddNew="perms.CanAdd"
+            EditFunction="perms.CanEdit"
+            DeleteFunction="perms.CanDelete" 
+            HasOperation="perms.CanEdit && perms.CanDelete">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="NhaCungCap" Title="Tên nhà cung cấp" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.TenNCC) />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="NhaCungCap" Sortable="false" Title="Số điện thoại" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.SDTNCC) />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="NhaCungCap" Sortable="false" Title="Địa chỉ" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.DiaChiNCC) />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+            </MoreColumns>
+            
+            <FormDialog Context="ctx">
+                <ThongTinNhaCungCap_Detail title=@title record="ctx" />
+            </FormDialog>
+        </Table>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    IQueryable<NhaCungCap> query = default!;
+    Table<NhaCungCap> GTable = default!;
+    string title = "nhà cung cấp";
+    protected override async Task OnInitializedAsync()
+    {
+        query = db.NhaCungCaps.AsNoTracking().AsQueryable() ?? Enumerable.Empty<NhaCungCap>().AsQueryable();
+    }
+
+    protected async Task Delete(NhaCungCap record)
+    {
+        try
+        {
+            db.NhaCungCaps.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", $"Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
+        }
+    }
+
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        query = db.NhaCungCaps.Where(item => item.TenNCC != null &&
+        item.TenNCC.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<NhaCungCap>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.NhaCungCaps.AsNoTracking().AsQueryable()
+        ??
+        Enumerable.Empty<NhaCungCap>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+}

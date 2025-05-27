@@ -1,0 +1,17 @@
+@page "/qlkho/logout"
+@inject AuthenticationStateProvider AuthProvider
+@inject NavigationManager Nav
+@using QLKHO.Authentication     
+
+@code {
+    protected override async Task OnInitializedAsync()
+    {
+        // 1) Xoá trạng thái đăng nhập + storage
+        await ((CustomAuthenticationStateProvider)AuthProvider)
+              .UpdateAuthenticationState(null);
+
+        // 2) Điều hướng về trang login
+        Nav.NavigateTo("/qlkho/login", forceLoad: true);
+
+    }
+}

@@ -1,0 +1,37 @@
+@* @inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+
+<div class="container">
+    <div class="row">
+        <div class="col-12 col-lg-12 d-flex align-items-center justify-content-center">
+            <RadzenDropDown style="margin-bottom: 4%; width: 100%" @bind-Value=@IdNguoiDung Data=@listNguoiDung
+                Multiple=true AllowClear=true ValueProperty="IdNguoiDung"
+                FilterCaseSensitivity="FilterCaseSensitivity.CaseInsensitive" AllowFiltering="true" Chips=true
+                TextProperty="TenDangNhap" SelectedItemsText="người dùng đã được chọn" />
+        </div>
+        <div class="col-12 col-lg-12 d-flex align-items-center justify-content-center">
+            <RadzenButton Text="Xác nhận" Icon="save" Click="@SelectNguoiDung" />
+        </div>
+
+    </div>
+</div>
+@code {
+    [Parameter] public List<int> listIdNguoiDung { get; set; } = new List<int>();
+
+    List<NguoiDung> listNguoiDung = new List<NguoiDung>();
+    List<int> IdNguoiDung = new List<int>();
+
+
+    protected async override Task OnInitializedAsync()
+    {
+        listNguoiDung = await db.NguoiDungs.Where(item => !listIdNguoiDung.Contains(item.IdNguoiDung)).ToListAsync();
+    }
+
+    protected void SelectNguoiDung()
+    {
+        NguoiDung temp = new NguoiDung();
+        temp.ListIdNguoiDung = IdNguoiDung;
+        dialog.Close(temp);
+    }
+} *@

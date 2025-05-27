@@ -1,0 +1,245 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+
+@if (!Loading)
+{
+
+    @for (int i = 0; i < listCheck.Count; i++)
+    {
+        clearDataUp(i);
+    }
+
+    <RadzenTabs>
+        <Tabs>
+            <RadzenTabsItem Text="Chức năng">
+                <Form TItem="Nhom" Record=@Nhom OnSubmit=@(args => Submit((Nhom)args))>
+                    <MoreForms>
+                        <div class="row">
+                            <FormField Size="12" Text="Tên nhóm">
+                                <RadzenTextBox @bind-Value=@Nhom.TenNhom />
+                            </FormField>
+
+                            <div class="col-12">
+                                <RadzenLabel Text="Danh sách chức năng"
+                                    Style="color: rgb(10, 10, 178); font-family: 'Source Sans 3'; font-weight:500; font-size: 18px; margin-bottom: 10px; margin-top: 10px; width: 100%">
+                                </RadzenLabel>
+                                <RadzenCard>
+                                    <RadzenTree Style="height: 400px; width: 100%">
+                                        @renderFeature(null, 1, "")
+                                    </RadzenTree>
+                                </RadzenCard>
+
+                            </div>
+                        </div>
+                    </MoreForms>
+                </Form>
+            </RadzenTabsItem>
+            <RadzenTabsItem Text="Cán bộ">
+            <Table TItem="NguoiDung" OnAdd="@(args => Add((NguoiDung)args))" heightForm="30vh" widthForm="50vw" TableTitle="người dùng trong nhóm" query=@query OnDelete="@(args => Delete((NguoiDung)args))" EditFunction="false" OnReloadData="@(args => GetData((List<NguoiDung>)args))" OnSearch="@(args => SearchVoid((string)args))" @ref=@GTable>
+                <MoreColumns>
+                    <RadzenDataGridColumn TItem="NguoiDung" Title="Tên đăng nhập" TextAlign="TextAlign.Left" Sortable="false"
+                                                                Width="200px" Property="Username">
+                        
+                        </RadzenDataGridColumn>
+                        <RadzenDataGridColumn TItem="NguoiDung" TextAlign="TextAlign.Left" Title="Họ tên" Property="TenNV" Sortable="false" Width="200px">
+                            <Template Context="ctx">
+                                @(listNguoiDung.Where(item => item.MaNV == ctx.MaNV).FirstOrDefault()?.TenNV ?? "")
+                            </Template>
+                        </RadzenDataGridColumn>
+                        
+                </MoreColumns>
+                            <FormDialog Context="ctx">
+                                <QuanTriNhom_NguoiDung listIdNguoiDung=@listIdNguoiDung/>
+                            </FormDialog>
+                        </Table>
+                    
+                        </RadzenTabsItem>
+        </Tabs>
+    </RadzenTabs>
+
+}
+else
+{
+    <LoadingDialog />
+}
+
+
+@code {
+    [Parameter] public int recordId { get; set; } = default!;
+    public class CheckList
+    {
+        public int id { get; set; } = 0;
+        public bool isActive { get; set; } = false;
+    }
+    Table<NguoiDung> GTable = default!;
+    List<NhanVien> listNguoiDung = new List<NhanVien>();
+    
+    IQueryable<NguoiDung> query = default!;
+
+    Nhom Nhom = new Nhom();
+    List<ChucNang> listChucNang = default!;
+    List<int> listIdNguoiDung = new List<int>();
+    List<CheckList> listCheck = new List<CheckList>();
+    bool Loading = true;
+    protected async override Task OnInitializedAsync()
+    {
+        listChucNang = await db.ChucNangs.ToListAsync();
+        listCheck = listChucNang.Select(item => new CheckList { id = item.IdChucNang, isActive = false }).ToList();
+        if (recordId != 0)
+        {
+            Nhom = await db.Nhoms.FirstOrDefaultAsync<Nhom>(item => item.IdNhom == recordId) ?? new Nhom();
+            listIdNguoiDung = await db.Nhom_NguoiDungs.Where(item => item.IdNhom == Nhom.IdNhom).Select(item => item.IdNguoiDung).ToListAsync();
+            List<int> listIdNhom_ChucNang = await db.Nhom_ChucNangs.Where(item => item.IdNhom == Nhom.IdNhom).Select(item =>
+                item.IdChucNang).ToListAsync();
+            listCheck.ForEach(item => { if (listIdNhom_ChucNang.Contains(item.id)) item.isActive = true; });
+        }
+        query = db.NguoiDungs.Where(item => listIdNguoiDung.Contains(item.IdNguoiDung)).AsNoTracking().AsQueryable();
+
+
+        Loading = false;
+    }
+
+
+    protected async Task Submit(Nhom obj)
+    {
+        try
+        {
+
+            if (obj.IdNhom == 0)
+            {
+                db.Nhoms.Add(obj);
+                await db.SaveChangesAsync();
+                notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+                
+            }
+            else
+            {
+                await db.Database.ExecuteSqlRawAsync("DELETE FROM Nhom_ChucNang WHERE IdNhom = {0}", obj.IdNhom);
+                await db.Database.ExecuteSqlRawAsync("DELETE FROM Nhom_NguoiDung WHERE IdNhom = {0}", obj.IdNhom);
+
+                db.Nhoms.Update(obj);
+                await db.SaveChangesAsync();
+                notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+            }
+            List<CheckList> listCheckNew = listCheck.Where(item => item.isActive == true).ToList();
+            for (int i = 0; i < listCheckNew.Count(); i++)
+            {
+                CheckList data = listCheckNew[i];
+                await db.Database.ExecuteSqlRawAsync("INSERT INTO Nhom_ChucNang (IdNhom,IdChucNang) VALUES ({0},{1})", obj.IdNhom,
+    listCheckNew[i].id);
+            }
+            for (int i = 0; i < listIdNguoiDung.Count(); i++)
+                {
+                    await db.Database.ExecuteSqlRawAsync("INSERT INTO Nhom_NguoiDung (IdNhom,IdNguoiDung) VALUES ({0},{1})", obj.IdNhom,
+                    listIdNguoiDung[i]);
+                }
+
+            dialog.Close(obj);
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: 2000);
+        }
+    }
+
+    RenderFragment renderFeature(int? Parent, int level, string STT)
+    {
+        List<ChucNang> list = listChucNang.Where(item => item.IdChucNangCha == Parent).OrderBy(item => item.STT).ToList();
+
+        return
+    @<div>
+        @for (int i = 0; i < list.Count; i++)
+    {
+    ChucNang tmp = list[i];
+    CheckList data = listCheck.Where(item => item.id == tmp.IdChucNang).FirstOrDefault() ?? new CheckList();
+    int index = listCheck.IndexOf(data);
+    List<string> arr = STT.Split(".").ToList();
+    if (arr[arr.Count - 1] == "")
+    {
+    arr[arr.Count - 1] = (1 + i).ToString();
+    }
+    else
+    {
+    arr.Add((1 + i).ToString());
+    }
+
+        <RadzenTreeItem>
+            <Template>
+                <RadzenCheckBox TValue="bool" @bind-Value=@listCheck[index].isActive Style="margin-right: 10px" />
+                @(String.Join(".",arr) + ". " + tmp.TenChucNang)
+
+            </Template>
+            <ChildContent>
+                @renderFeature(tmp.IdChucNang, level + 1, String.Join(".", arr))
+            </ChildContent>
+        </RadzenTreeItem>
+    }
+    </div>
+;
+    }
+
+    void clearDataUp(int index)
+    {
+        if (index > listChucNang.Count) return;
+        ChucNang current_node = listChucNang[index];
+        ChucNang parent_node = listChucNang.Where(item => item.IdChucNang == current_node.IdChucNangCha).FirstOrDefault() ??
+        new ChucNang();
+        if (parent_node.IdChucNang == 0) return;
+        int indexParent = listChucNang.IndexOf(parent_node);
+        if (listCheck[index].isActive && listCheck[indexParent].isActive == false)
+        {
+            listCheck[indexParent].isActive = true;
+        }
+    }
+
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        query = db.NguoiDungs.Where(item => item.Username != null &&
+        item.Username.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<NguoiDung>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+    protected async Task GetData(List<NguoiDung> listData)
+    {
+        List<int?> listMaNV = listData.Select(item => item.MaNV).ToList();
+        listNguoiDung = await db.NhanViens.Where(item =>
+        listMaNV.Contains(item.MaNV)).ToListAsync();
+    }
+    protected async Task ResetVoid()
+    {
+        query = db.NguoiDungs.Where(item => listIdNguoiDung.Contains(item.IdNguoiDung)).AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+    protected async Task Delete(NguoiDung record)
+    {
+        try
+        {
+            if(recordId != 0){
+                await db.Database.ExecuteSqlRawAsync("DELETE FROM Nhom_NguoiDung WHERE IdNguoiDung = {0} AND IdNhom = {}", record.IdNguoiDung, Nhom.IdNhom);
+                await db.SaveChangesAsync();
+            } else {
+                listIdNguoiDung = listIdNguoiDung.Where(item => item != record.IdNguoiDung).ToList();
+            }
+            
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", "Đã xóa liệu", duration: 1500);
+
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu", duration: -1);
+        }
+    }
+
+    protected async Task Add(NguoiDung record){
+        if(record.ListIdNguoiDung.Count() > 0){
+            listIdNguoiDung.AddRange(record.ListIdNguoiDung);
+            query = db.NguoiDungs.Where(item => listIdNguoiDung.Contains(item.IdNguoiDung)).AsQueryable();
+
+            await GTable.Refresh();
+        }
+    }
+}

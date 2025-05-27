@@ -1,0 +1,104 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@using Newtonsoft.Json
+
+@if (!Loading)
+{
+        <Form TItem="CuaHang" AddNew="true" Record=@CuaHang OnSubmit=@(args => Submit((CuaHang)args))>
+        <MoreForms>
+            <div class="row">
+                <FormField Size="4" Text="Tên cửa hàng">
+                    <RadzenTextBox @bind-Value="CuaHang.TenCH" Name="TenCH" Style="width:100%" />
+                    <RadzenRequiredValidator Text="Không được để trống" Component="TenCH" Popup="true" />
+                </FormField>
+
+                <FormField Size="4" Text="Số điện thoại">
+                    <RadzenTextBox @bind-Value="CuaHang.SDTCH" Name="SDTCH" Style="width:100%" /> 
+                    <RadzenRequiredValidator Text="Không được để trống" Component="SDTCH" Popup="true" />
+                </FormField>
+
+                <FormField Size="4" Text="Địa chỉ">
+                    <RadzenTextBox @bind-Value="CuaHang.DiaChiCH" Name="DiaChiCH" Style="width:100%" />
+                    <RadzenRequiredValidator Text="Không được để trống" Component="DiaChiCH" Popup="true" />
+                </FormField>
+            </div>
+        </MoreForms>
+    </Form>
+}
+else
+{
+        <LoadingDialog />
+}
+
+
+@code {
+    [Parameter] public string title { get; set; } = "";
+    [Parameter] public CuaHang record { get; set; } = default!;
+
+    CuaHang CuaHang = new CuaHang();
+    bool Loading = true;
+    int count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (record.MaCH != 0)
+        {
+            CuaHang = await db.CuaHangs.FirstOrDefaultAsync<CuaHang>(item => item.MaCH == record.MaCH)
+            ?? new CuaHang();
+        }
+        Loading = false;
+    }
+
+    protected async Task Submit(CuaHang obj)
+    {
+        try
+        {
+            var confirmResult = await dialog.Confirm
+            (
+            $"Chắc chắn muốn lưu thông tin ?",
+            "Xác nhận thông tin",
+            new ConfirmOptions()
+                {
+                    OkButtonText = "Đồng ý",
+                    CancelButtonText = "Hủy",
+                    Width = "400px"
+                }
+            );
+
+            if (!confirmResult.HasValue || !confirmResult.Value)
+            {
+                return;
+            }            
+
+            if (obj.MaCH == 0)
+            {
+                db.CuaHangs.Add(obj);
+                await db.SaveChangesAsync(); 
+                notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+                }
+            else
+            {
+                db.CuaHangs.Update(obj);
+                await db.SaveChangesAsync();
+                notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+            }
+
+            dialog.Close(obj);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_CuaHang_TenCH_Norm") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Trùng tên", "Cửa hàng này đã tồn tại!", 4000);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("CK_SDTCH_OnlyDigits") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Lỗi số điện thoại", "Số điện thoại phải có 10 số và chỉ được chứa ký tự số!", 4000);
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"{e}", null, duration: -1);
+        }
+    }
+}

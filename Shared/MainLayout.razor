@@ -1,0 +1,247 @@
+﻿@inherits LayoutComponentBase
+@using QLKHO.components.Menu
+@using QLKHO.Shared
+@inject NavigationManager Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@using System.Security.Claims
+@inject IDbContextFactory<QLKHOContext> DbFactory
+@using Microsoft.AspNetCore.Components.Routing;
+
+
+@attribute [Authorize]
+<RadzenDialog />
+<RadzenNotification />
+<RadzenContextMenu />
+<RadzenTooltip />
+
+<PageTitle>Quản lý kho hàng</PageTitle>
+<AuthorizeView>
+    <NotAuthorized>
+        <RedirectToLogin />
+    </NotAuthorized>
+    <Authorized>
+        @* Khi chưa xong phân quyền thì chỉ show loading *@
+        @if (!initialized)
+        {
+            <div class="loading-container">
+            <p>Đang tải quyền…</p>
+            </div>
+        }
+        else
+        {
+        <CascadingValue Value="perms" @key="@perms">
+        @* Khi initialized==true mới show sidebar + page content *@
+        <div class="@("sidebar " + menuMode)">
+            <div class="logo-details">
+                <i><img src="logo.png" style="width: 35px" /></i>
+                <span class="logo_name">Quản lý kho hàng</span>
+            </div>
+            <ul class="nav-links">
+                @{
+                    List<ChucNang> listParent = listChucNang.Where(item => item.IdChucNangCha == null).ToList();
+                    for (int i = 0; i < listParent.Count; i++)
+                    {
+                        ChucNang data = listParent[i];
+                        List<ChucNang> listChild = listChucNang.Where(item => item.IdChucNangCha == data.IdChucNang).ToList();
+                        if (listChild.Count > 0)
+                        {
+                            <Menu Path="@data.DuongDan" Name="@data.TenChucNang" Icon="@data.Icon" isClose=@isClose>
+                                <SubMenus>
+                                    @for (int j = 0; j < listChild.Count; j++)
+                                    {
+                                        ChucNang child = listChild[j];
+                                        <SubMenu Id="@child.IdChucNang" Focus="@dictFocus[child.IdChucNang]" Path="@child.DuongDan"
+                                            Name="@child.TenChucNang" Icon=@child.Icon
+                                            OnClickMenu="@(args => onClickMenu((int)args))" />
+                                    }
+
+                                </SubMenus>
+                            </Menu>
+                        }
+                        else
+                        {
+                            <Menu Path="@data.DuongDan" Name="@data.TenChucNang" Icon="@data.Icon" isClose=@isClose />
+                        }
+
+                    }
+                }
+
+            </ul>
+        </div>
+        <section class="home-section">
+            <div class="home-content justify-content-between">
+
+                <div style="margin-top:0.3rem">
+                    <i class='bx bx-menu' style="color: white" @onclick="@toggleMenu"></i>
+                </div>
+                <div>
+                    <RadzenProfileMenu Style="background: none">
+                        <Template>
+                            <RadzenImage Path="logo.png" Style="width: 35px; height: 35px; margin-right: 0.2rem" />
+                            <span style="color: white">@(NhanVien.TenNV ?? "Admin")
+                            </span>
+                        </Template>
+                        <ChildContent>
+                            <RadzenProfileMenuItem Path="qlkho/logout" Text="Đăng xuất" Icon="logout">
+                            </RadzenProfileMenuItem>
+                            <RadzenProfileMenuItem Path="qlkho/thong-tin-ca-nhan" Text="Thông tin cá nhân"
+                                Icon="account_circle">
+                            </RadzenProfileMenuItem>
+                        </ChildContent>
+                    </RadzenProfileMenu>
+
+
+                </div>
+
+            </div>
+            <div style="margin-left: 1.5rem">
+                <CascadingValue Value="perms">
+                    @Body
+                </CascadingValue>
+
+            </div>
+
+        </section>
+        </CascadingValue>
+        }
+    </Authorized>
+</AuthorizeView>
+
+
+
+@code {
+
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    string menuMode = "";
+    bool isClose = false;
+    List<ChucNang> listChucNang = new List<ChucNang>();
+    Dictionary<int, bool> dictFocus = new Dictionary<int, bool>();
+    NhanVien NhanVien = new NhanVien();
+    PagePermissions perms = new PagePermissions();
+
+    // phân quyền
+    bool initialized;
+    bool CanView, CanAdd, CanEdit, CanDelete;
+    protected void toggleMenu()
+    {
+        menuMode = menuMode == "" ? "close" : "";
+        isClose = !isClose;
+    }
+    
+    int           idNguoiDung = 0;
+    int           idNhanVien  = 0;
+
+    private async Task LoadPermissionsAsync()
+    {
+        initialized = false;
+        StateHasChanged();       // hiện “Đang tải quyền…”
+
+        await using var db = await DbFactory.CreateDbContextAsync();
+
+        // 1. Lấy username
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        if (!(auth.User?.Identity?.IsAuthenticated ?? false))
+        {
+            initialized = true;       // tắt spinner
+            StateHasChanged();
+            return;
+        }
+        
+        var username = auth.User.Identity?.Name;
+
+        // 2. Tìm user và nhóm
+        if (!string.IsNullOrEmpty(username))
+        {
+            var user = await db.NguoiDungs.FirstOrDefaultAsync(u => u.Username == username);
+        
+            var nhomIds = await db.Nhom_NguoiDungs
+                               .Where(n => n.IdNguoiDung == user.IdNguoiDung)
+                               .Select(n => n.IdNhom)
+                               .ToListAsync();
+
+            // 2.1. Build menu
+            var chucNangIds = await db.Nhom_ChucNangs
+                                    .Where(x => nhomIds.Contains(x.IdNhom))
+                                    .Select(x => x.IdChucNang)
+                                    .Distinct()
+                                    .ToListAsync();
+
+            listChucNang = await db.ChucNangs
+                                .Where(x => chucNangIds.Contains(x.IdChucNang))
+                                .OrderBy(x => x.STT)
+                                .ToListAsync();
+
+            dictFocus = listChucNang.ToDictionary(c => c.IdChucNang, _ => false);
+
+            // --- Phân quyền cho trang con ngay trong layout ---
+            // 3. Tìm IdChucNang dựa vào path
+            var path = new Uri(Nav.Uri).AbsolutePath;   // ví dụ "/qlkho/thong-tin-loai-san-pham"
+            if (path is "/qlkho/login" or "/qlkho/logout" or "/qlkho/404" or "/" or "/qlkho" or "/qlkho/home")
+            {
+                initialized = true;        // bỏ spinner
+                StateHasChanged();
+                return;          
+            }
+            var func = await db.ChucNangs
+                            .FirstOrDefaultAsync(c => c.DuongDan == path);
+
+            if (func != null)
+            {
+                // 4. Lấy quyền OR (nếu user vào nhiều nhóm)
+                var perm = await db.Nhom_ChucNangs
+                                    .Where(nc => nc.IdChucNang == func.IdChucNang
+                                            && nhomIds.Contains(nc.IdNhom))
+                                    .FirstOrDefaultAsync();
+
+                if (perm != null)
+                {
+                    CanView   = perm.AllowView;
+                    CanAdd    = perm.AllowAdd;
+                    CanEdit   = perm.AllowEdit;
+                    CanDelete = perm.AllowDelete;
+                }
+                
+                // Gán vào perms để truyền xuống page con
+                perms.CanView   = CanView;
+                perms.CanAdd    = CanAdd;
+                perms.CanEdit   = CanEdit;
+                perms.CanDelete = CanDelete;
+            }
+        }
+
+        if (!CanView)
+        {
+            // user gõ URL lậu → chuyển về 404 riêng
+            Nav.NavigateTo("/qlkho/404", forceLoad: true);
+            return;
+        }
+
+        initialized = true;
+        StateHasChanged();
+    }
+    protected override async Task OnInitializedAsync()
+    {     
+        Nav.LocationChanged += OnLocationChanged;
+        await LoadPermissionsAsync();
+    }
+
+    /******** Xử lý khi đổi URL ********/
+    private async void OnLocationChanged(object? sender, LocationChangedEventArgs e)
+    {
+        //await InvokeAsync(async () => await LoadPermissionsAsync());
+        await LoadPermissionsAsync();
+    }
+
+    /******** Gỡ sự kiện khi layout bị hủy ********/
+    public void Dispose()
+        => Nav.LocationChanged -= OnLocationChanged;
+
+    protected void onClickMenu(int id)
+    {
+        for (int i = 0; i < listChucNang.Count(); i++)
+        {
+            dictFocus[listChucNang[i].IdChucNang] = false;
+        }
+        dictFocus[id] = true;
+    }
+}

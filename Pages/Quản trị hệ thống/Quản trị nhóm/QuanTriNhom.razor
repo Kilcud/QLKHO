@@ -1,0 +1,76 @@
+@page "/qlkho/quan-ly-nhom"
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+
+@attribute [Authorize]
+<AuthorizeView>
+    <Authorized>
+        @* @if (context.User.Identity?.Name != null && !(context.User.Identity?.Name?.Split(" ")[3].Contains("quan-ly-nguoi-dung") ??
+        false))
+        {
+                        <RedirectToHome />
+        } *@
+        <Table TItem="Nhom" TableTitle="nhóm" query=@query OnSearch="@(args => SearchVoid((string)args))"
+            OnReset="@(args => ResetVoid())" @ref=@GTable OnDelete="@(args => Delete((Nhom)args))">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="Nhom" TextAlign="TextAlign.Left" Title="Tên nhóm" Property="TenNhom"
+                    Sortable="false" Width="400px">
+                    <Template Context="ctx">
+                        @(ctx.TenNhom ?? "")
+                    </Template>
+
+                </RadzenDataGridColumn>
+
+            </MoreColumns>
+
+            <FormDialog Context="ctx">
+                <QuanTriNhom_Detail recordId="ctx.IdNhom" />
+            </FormDialog>
+        </Table>
+
+    </Authorized>
+</AuthorizeView>
+
+@code {
+
+    Table<Nhom> GTable = default!;
+    IQueryable<Nhom> query = default!;
+
+
+    protected override void OnInitialized()
+    {
+
+        query = db.Nhoms.AsQueryable() ?? Enumerable.Empty<Nhom>().AsQueryable();
+    }
+
+    protected async Task Delete(Nhom record)
+    {
+        try
+        {
+            db.Nhoms.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", "Đã xóa liệu", duration: 1500);
+
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu", duration: -1);
+        }
+    }
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        query = db.Nhoms.Where(item => item.TenNhom != null && item.TenNhom.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<Nhom>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.Nhoms.AsQueryable() ??
+        Enumerable.Empty<Nhom>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+}

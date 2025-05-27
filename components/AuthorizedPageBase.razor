@@ -1,0 +1,67 @@
+@* @inherits LayoutComponentBase
+@inject QLKHOContext db
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NavigationManager Nav
+
+@if (!initialized)
+{
+    <p>Đang tải dữ liệu…</p>
+}
+else if (!CanView)
+{
+    <p class="text-danger">Bạn không có quyền xem trang này.</p>
+}
+else
+{
+    @Body
+}
+
+@code {
+    //[Parameter] public RenderFragment? ChildContent { get; set; }
+
+    protected bool initialized;
+    protected bool CanView, CanAdd, CanEdit, CanDelete;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // 1. Lấy username
+        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
+        var username = auth.User.Identity?.Name;
+        if (string.IsNullOrEmpty(username))
+        {
+            initialized = true; return;
+        }
+
+        // 2. Tìm user và nhóm
+        var user = await db.NguoiDungs.FirstOrDefaultAsync(u => u.Username == username);
+        if (user == null)
+        {
+            initialized = true; return;
+        }
+        var groupIds = await db.Nhom_NguoiDungs
+                               .Where(n => n.IdNguoiDung == user.IdNguoiDung)
+                               .Select(n => n.IdNhom)
+                               .ToListAsync();
+
+        // 3. Tìm chức năng
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        var func = await db.ChucNangs.FirstOrDefaultAsync(c => c.DuongDan == path);
+        if (func != null)
+        {
+            // 4. Lấy quyền
+            var perm = await db.Nhom_ChucNangs
+                               .Where(nc => nc.IdChucNang == func.IdChucNang
+                                         && groupIds.Contains(nc.IdNhom))
+                               .FirstOrDefaultAsync();
+            if (perm != null)
+            {
+                CanView   = perm.AllowView;
+                CanAdd    = perm.AllowAdd;
+                CanEdit   = perm.AllowEdit;
+                CanDelete = perm.AllowDelete;
+            }
+        }
+
+        initialized = true;
+    }
+} *@

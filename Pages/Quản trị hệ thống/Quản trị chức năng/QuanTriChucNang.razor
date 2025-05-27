@@ -1,0 +1,202 @@
+@page "/qlkho/quan-ly-chuc-nang"
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <style>
+            .thao-tac-chuc-nang {
+                display: none;
+            }
+
+            .chuc-nang {
+                min-height: 30px;
+            }
+
+            .chuc-nang:hover .thao-tac-chuc-nang {
+                display: block;
+            }
+
+            .rz-treenode-content .rz-treenode-label {
+                width: 100%;
+            }
+        </style>
+    </Authorized>
+</AuthorizeView>
+
+
+<div class="row" style="margin-bottom:10px; margin-top: 20px">
+    <div class="col-md-12">
+        <RadzenLabel
+            Style="text-align: center;color: blue; font-family: 'Source Sans 3', sans-serif ; font-weight: 1500; width: 100%; font-size: 25px "
+            Text="DANH SÁCH CHỨC NĂNG">
+        </RadzenLabel>
+    </div>
+</div>
+
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12 col-md-12 col-lg-8" style="padding: 0px">
+            <RadzenCard Style="padding: 20px 6px;">
+                <RadzenTree Style="height: 640px; width: 100%; margin-top: 10px">
+                    @renderFeature(null, 1, "")
+                </RadzenTree>
+            </RadzenCard>
+        </div>
+        <div class="col-12 col-md-12 col-lg-4">
+            @if (TuyChinhChucNang == true)
+            {
+                            <ChucNang_Detail Record="@ChucNangDuocChon" ThemCungCap="@ThemCungCap" ReturnChucNang="@(arg => {
+                                                                                  TuyChinhChucNang = false;
+                                                                                  if (arg != null)
+                                                                                  {
+                                                                                      listFeature = db.ChucNangs.OrderBy(item => item.STT).ToList();
+                                                                                  }
+                                                                              })" />
+            }
+        </div>
+    </div>
+</div>
+
+
+
+@code {
+
+
+    List<ChucNang> listFeature = new List<ChucNang>();
+    ChucNang ChucNangDuocChon = new ChucNang();
+
+
+
+    bool TuyChinhChucNang = false;
+    int? ThemCungCap = null;
+
+    void ThemChucNangCungCap(ChucNang ChucNangChon)
+    {
+        ChucNangDuocChon = new ChucNang();
+        TuyChinhChucNang = true;
+        ThemCungCap = ChucNangChon.IdChucNang;
+    }
+
+    void ThemChucNangCon(ChucNang ChucNangChon)
+    {
+        ChucNangDuocChon = new ChucNang();
+        ChucNangDuocChon.IdChucNangCha = ChucNangChon.IdChucNang;
+        TuyChinhChucNang = true;
+        ThemCungCap = ChucNangChon.IdChucNang;
+    }
+
+    void ChinhSuaChucNang(ChucNang ChucNangChon)
+    {
+        ChucNangDuocChon = ChucNangChon;
+        TuyChinhChucNang = true;
+        ThemCungCap = null;
+    }
+
+    void DeleteDown(ChucNang ChucNangChon)
+    {
+        List<ChucNang> listChucNangCon = db.ChucNangs.Where(item => item.IdChucNangCha ==
+        ChucNangChon.IdChucNang).ToList();
+        listChucNangCon.ForEach(item =>
+        {
+    DeleteDown(item);
+        });
+        db.ChucNangs.Remove(ChucNangChon);
+        db.SaveChanges();
+    }
+
+    async void XoaChucNang(ChucNang ChucNangChon)
+    {
+        var confirmResult = await dialog.Confirm
+        (
+        "Chắc chắn muốn xóa?",
+        "Xác nhận xoá",
+        new ConfirmOptions()
+        {
+            OkButtonText = "Đồng ý",
+            CancelButtonText = "Hủy",
+        }
+        );
+        if (confirmResult.HasValue && confirmResult.Value)
+        {
+            DeleteDown(ChucNangChon);
+            notificationService.Notify(NotificationSeverity.Success, "Xóa thành công", null, duration: 1500);
+            listFeature = db.ChucNangs.OrderBy(item => item.STT).ToList();
+            StateHasChanged();
+        }
+    }
+
+    async void DoiCho(ChucNang src, ChucNang des)
+    {
+        int tmp = src.STT;
+        src.STT = des.STT;
+        des.STT = tmp;
+        db.ChucNangs.Update(src);
+        db.ChucNangs.Update(des);
+        await db.SaveChangesAsync();
+        listFeature = db.ChucNangs.OrderBy(item => item.STT).ToList();
+    }
+
+    RenderFragment renderFeature(int? Parent, int level, string STT)
+    {
+        List<ChucNang> list = listFeature.Where(item => item.IdChucNangCha == Parent).OrderBy(item => item.STT).ToList();
+
+        return
+        @<div>
+                        @for (int i = 0; i < list.Count; i++)
+        {
+        ChucNang tmp = list[i];
+        int Index = listFeature.IndexOf(tmp);
+        List<string> arr = STT.Split(".").ToList();
+        if (arr[arr.Count - 1] == "")
+        {
+        arr[arr.Count - 1] = (1 + i).ToString();
+        }
+        else
+        {
+        arr.Add((1 + i).ToString());
+        }
+
+                        <RadzenTreeItem>
+                            <Template>
+                                <div class="container-fluid chuc-nang">
+                                    <div class="row">
+                                        <div class="col-7" style="padding: 0px">
+                                            @(String.Join(".",arr) + ". " + tmp.TenChucNang)
+                                        </div>
+                                        <div class="col-5 thao-tac-chuc-nang" style="padding: 0px">
+                                            <RadzenButton Icon="edit" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Warning"
+                                                Click="args => ChinhSuaChucNang(tmp)" />
+                                            <RadzenButton Icon="delete" Size="ButtonSize.Small" ButtonStyle="ButtonStyle.Danger"
+                                                Click="args => XoaChucNang(tmp)" />
+                                            <RadzenButton Size="ButtonSize.Small" Icon="subdirectory_arrow_left"
+                                                Click="args => ThemChucNangCungCap(tmp)"></RadzenButton>
+                                            <RadzenButton Size="ButtonSize.Small" Icon="add" Click="args => ThemChucNangCon(tmp)">
+                                            </RadzenButton>
+                                            <RadzenButton Icon="arrow_drop_down" Size="ButtonSize.Small"
+                                                Disabled="list.IndexOf(tmp)==list.Count - 1"
+                                                Click="args =>  DoiCho(tmp, list[list.IndexOf(tmp) + 1])" />
+                                            <RadzenButton Icon="arrow_drop_up" Size="ButtonSize.Small" Disabled="list.IndexOf(tmp)==0"
+                                                Click="args => DoiCho(list[list.IndexOf(tmp) - 1], tmp)" />
+                                        </div>
+                                    </div>
+                                </div>
+                            </Template>
+                            <ChildContent>
+                                @renderFeature(tmp.IdChucNang, level + 1, String.Join(".", arr))
+                            </ChildContent>
+                        </RadzenTreeItem>
+        }
+                    </div>
+    ;
+    }
+
+    protected override async Task OnInitializedAsync()
+    {
+        listFeature = await db.ChucNangs.OrderBy(item => item.STT).ToListAsync();
+
+
+    }
+}

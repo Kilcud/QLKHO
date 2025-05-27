@@ -1,0 +1,109 @@
+@page "/qlkho/thong-tin-san-pham"
+
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <Table TItem="SanPham" TableTitle=@title query=@query
+            OnDelete="@(args => Delete((SanPham)args))" OnSearch="@(args => SearchVoid((string)args))"
+            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="SanPham" Title="Tên sản phẩm" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.TenSP) />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="SanPham" Sortable="false" Title="Kho" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.MaKho == null ? "" : listKho.Where(item => item.MaKho == ctx.MaKho).FirstOrDefault()?.TenKho ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="SanPham" Sortable="false" Title="Loại sản phẩm" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.MaLSP == null ? "" : listLoaiSanPham.Where(item => item.MaLSP == ctx.MaLSP).FirstOrDefault()?.TenLSP ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="SanPham" Title="Đơn giá nhập" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        @(String.Format("{0:N0}", ctx.DonGiaNhap) + " đ") <!-- Định dạng tiền tệ -->
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="SanPham" Title="Đơn giá xuất" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        @(String.Format("{0:N0}", ctx.DonGiaXuat) + " đ") <!-- Định dạng tiền tệ -->
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="SanPham" Title="Hạn sử dụng" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        @(ctx.HSD.ToString("dd/MM/yyyy"))
+                    </Template>
+                </RadzenDataGridColumn>
+                   
+            </MoreColumns>
+            
+            <FormDialog Context="ctx">
+                <ThongTinSanPham_Detail title=@title record="ctx" />
+            </FormDialog>
+        </Table>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    IQueryable<SanPham> query = default!;
+    List<Kho> listKho = new List<Kho>();
+    List<LoaiSanPham> listLoaiSanPham = new List<LoaiSanPham>();
+    Table<SanPham> GTable = default!;
+    string title = "sản phẩm";
+    protected override async Task OnInitializedAsync()
+    {
+        query = db.SanPhams.AsNoTracking().AsQueryable() ?? Enumerable.Empty<SanPham>().AsQueryable();
+        listKho = db.Khos.ToList();
+        listLoaiSanPham = db.LoaiSanPhams.ToList();
+    }
+
+    protected async Task Delete(SanPham record)
+    {
+        try
+        {
+            db.SanPhams.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", $"Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
+            db.Entry(record).State = EntityState.Detached;      // gỡ khỏi DbContext
+            await GTable.CancelEdit(record);    
+            await GTable.Refresh(); 
+        }
+    }
+
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        query = db.SanPhams.Where(item => item.TenSP != null &&
+        item.TenSP.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<SanPham>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.SanPhams.AsNoTracking().AsQueryable()
+        ??
+        Enumerable.Empty<SanPham>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+}

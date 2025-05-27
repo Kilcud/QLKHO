@@ -1,0 +1,120 @@
+@page "/qlkho/thong-tin-phieu-nhap"
+
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@inject NavigationManager UriHelper
+
+@attribute [Authorize]
+    <AuthorizeView>
+        <Authorized>
+            <Table TItem="PhieuNhap" TableTitle=@title query=@query
+                OnDelete="@(args => Delete((PhieuNhap)args))" OnSearch="@(args => SearchVoid((string)args))"
+                OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh" 
+                AddNew="perms.CanAdd"
+                EditFunction="perms.CanEdit"
+                DeleteFunction="perms.CanDelete" 
+                HasOperation="perms.CanEdit && perms.CanDelete">
+                <MoreColumns>
+                    <RadzenDataGridColumn TItem="PhieuNhap" Title="Tên phiếu nhập" Sortable="false" Width="50px">
+                        <Template Context="ctx">
+                            <WrapWord Data=@("PN" + ctx.MaPN.ToString("D2")) />
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="PhieuNhap" Sortable="false" Title="Kho" Width="50px">
+                        <Template Context="ctx">
+                            <WrapWord Data=@(ctx.MaKho == null ? "" : listKho.Where(item => item.MaKho == ctx.MaKho).FirstOrDefault()?.TenKho ?? "") />
+                        </Template>
+                    </RadzenDataGridColumn>   
+
+                    <RadzenDataGridColumn TItem="PhieuNhap" Sortable="false" Title="Nhân viên" Width="50px">
+                        <Template Context="ctx">
+                            <WrapWord Data=@(ctx.MaNV == null ? "" : listNhanVien.Where(item => item.MaNV == ctx.MaNV).FirstOrDefault()?.TenNV ?? "") />
+                        </Template>
+                    </RadzenDataGridColumn>   
+
+                    <RadzenDataGridColumn TItem="PhieuNhap" Sortable="false" Title="Nhà cung cấp" Width="50px">
+                        <Template Context="ctx">
+                            <WrapWord Data=@(ctx.MaNCC == null ? "" : listNhaCungCap.Where(item => item.MaNCC == ctx.MaNCC).FirstOrDefault()?.TenNCC ?? "") />
+                        </Template>
+                    </RadzenDataGridColumn>   
+
+                    <RadzenDataGridColumn TItem="PhieuNhap" Title="Giá nhập" Sortable="false" Width="50px">
+                        <Template Context="ctx">
+                            @(String.Format("{0:N0}", ctx.GiaNhap) + " đ") <!-- Định dạng tiền tệ -->
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                    <RadzenDataGridColumn TItem="PhieuNhap" Title="Ngày nhập" Sortable="false" Width="50px">
+                        <Template Context="ctx">
+                            @(ctx.NgayNhap.ToString("dd/MM/yyyy"))
+                        </Template>
+                    </RadzenDataGridColumn>
+
+                </MoreColumns>
+                
+                <FormDialog Context="ctx">
+                    <ThongTinPhieuNhap_Detail title=@title record="ctx" />
+                </FormDialog>
+            </Table>
+        </Authorized>
+</AuthorizeView>
+
+
+@code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    IQueryable<PhieuNhap> query = default!;
+    List<Kho> listKho = new List<Kho>();
+    List<NhanVien> listNhanVien = new List<NhanVien>();
+    List<NhaCungCap> listNhaCungCap = new List<NhaCungCap>();
+
+    Table<PhieuNhap> GTable = default!;
+    string title = "phiếu nhập";
+    protected override async Task OnInitializedAsync()
+    {
+        query = db.PhieuNhaps.AsNoTracking().AsQueryable() ?? Enumerable.Empty<PhieuNhap>().AsQueryable();
+        listKho = db.Khos.ToList();
+        listNhanVien = db.NhanViens.ToList();
+        listNhaCungCap = db.NhaCungCaps.ToList();
+    }
+
+    protected async Task Delete(PhieuNhap record)
+    {
+        try
+        {
+            // Xóa các chi tiết phiếu nhập liên quan
+            var chiTietList = db.ChiTietPhieuNhaps.Where(ct => ct.MaPN == record.MaPN);
+            db.ChiTietPhieuNhaps.RemoveRange(chiTietList);
+
+            // Xóa phiếu nhập
+            db.PhieuNhaps.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", $"Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
+        }
+    }
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        @* query = db.PhieuNhaps.Where(item => item.TenPN != null &&
+        item.TenLSP.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<PhieuNhap>().AsQueryable();
+
+        await GTable.Refresh(); *@
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.PhieuNhaps.AsNoTracking().AsQueryable()
+        ??
+        Enumerable.Empty<PhieuNhap>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+}

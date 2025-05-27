@@ -1,0 +1,153 @@
+@page "/qlkho/thong-tin-loai-san-pham"
+
+@attribute [Authorize]
+@inject QLKHOContext db
+@inject NotificationService notificationService
+@layout QLKHO.Shared.MainLayout
+@using QLKHO.Shared
+
+    <Inline @ref="inline"
+        TItem="LoaiSanPham"
+        TableTitle="Loại sản phẩm"
+        query="@query"
+        OnCreate="Create"
+        OnUpdate="Update"
+        OnDelete="Delete"
+        DisableAdd="!perms.CanAdd"
+        EditFunction="perms.CanEdit"
+        DeleteFunction="perms.CanDelete" HasOperation="perms.CanEdit && perms.CanDelete">
+        <MoreColumns>
+            <RadzenDataGridColumn TItem="LoaiSanPham" Sortable="false" Title="Tên loại sản phẩm" Width="640px"
+                TextAlign="TextAlign.Left" Property="TenLSP">
+                <EditTemplate Context="ctx">
+                    <RadzenTextBox @bind-Value=@ctx.TenLSP Style="width: 100%" Placeholder="Tên loại sản phẩm" />
+                </EditTemplate>
+            </RadzenDataGridColumn>
+            <RadzenDataGridColumn TItem="LoaiSanPham" Sortable="false" Title="Thay đổi thứ tự" Width="80px"
+                TextAlign="TextAlign.Center">
+                <Template Context="ctx">
+                    <RadzenButton Size="ButtonSize.ExtraSmall" Icon="south" Click="@(() => SortSTT(ctx,"down"))" />
+                    <RadzenButton Size="ButtonSize.ExtraSmall" Icon="north" Click="@(() => SortSTT(ctx,"up"))" />
+                </Template>
+            </RadzenDataGridColumn>
+        </MoreColumns>
+    </Inline>
+
+@code {    
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+
+    IQueryable<LoaiSanPham> query = default!;
+
+    Inline<LoaiSanPham> inline = default!;
+
+    protected override async Task OnInitializedAsync()
+    {
+        query = db.LoaiSanPhams.OrderBy(x => x.STT);
+    }
+
+    protected async Task Create(LoaiSanPham record)
+    {
+        try
+        {
+            // Nếu AddRow() đã gán STT, không cần (và không nên) tính lại
+            if (record.STT == 0)
+            {
+                var orderedStt = await db.LoaiSanPhams
+                                        .OrderBy(x => x.STT)
+                                        .Select(x => x.STT)
+                                        .ToListAsync();
+
+                int nextStt = 1;
+                foreach (var s in orderedStt)
+                {
+                    if (s == nextStt) nextStt++;
+                    else if (s > nextStt) break;
+                }
+                record.STT = nextStt;
+            }
+            db.LoaiSanPhams.Add(record);
+            await db.SaveChangesAsync();
+            
+            notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_LoaiSanPham_TenLSP_Norm") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Trùng tên", "Loại sản phẩm này đã tồn tại!", 4000);
+            db.Entry(record).State = EntityState.Detached;      // gỡ khỏi DbContext
+            await inline.CancelEdit(record);                    // thoát edit/insert
+            return;
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: -1);
+            db.Entry(record).State = EntityState.Detached;      // gỡ khỏi DbContext
+            await inline.CancelEdit(record);                    // thoát edit/insert
+        }
+        await inline.ReloadTable();                    
+
+    }
+        
+    protected async Task Update(LoaiSanPham record)
+    {
+        try
+        {
+            db.LoaiSanPhams.Update(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: -1);
+        }
+    }
+    protected async Task Delete(LoaiSanPham record)
+    {
+        try
+        {
+            db.LoaiSanPhams.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", "Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu", duration: -1);
+        }
+        await inline.ReloadTable(); 
+    }
+    protected async Task SortSTT(LoaiSanPham record, string typeSort)
+    {
+        LoaiSanPham near = new LoaiSanPham();
+        if (typeSort == "up")
+        {
+            near = await db.LoaiSanPhams.OrderBy(item => -item.STT).Where(item => item.STT <
+            record.STT).FirstOrDefaultAsync() ?? new LoaiSanPham();
+
+        }
+        if (typeSort == "down")
+        {
+            near = await db.LoaiSanPhams.OrderBy(item => item.STT).Where(item => item.STT >
+            record.STT).FirstOrDefaultAsync() ?? new LoaiSanPham();
+
+        }
+        if (near.MaLSP != 0)
+        {
+            int temp = record.STT;
+            record.STT = near.STT;
+            near.STT = temp;
+            List<LoaiSanPham> listUpdate = new List<LoaiSanPham>() { record, near };
+            db.LoaiSanPhams.UpdateRange(listUpdate);
+            await db.SaveChangesAsync();
+
+            // Cập nhật lại truy vấn với thứ tự mới
+            query = db.LoaiSanPhams.OrderBy(x => x.STT).AsQueryable();
+
+            // Tải lại bảng
+            await inline.ReloadTable();
+
+            // Cập nhật lại giao diện
+            StateHasChanged();
+        }
+    }
+}

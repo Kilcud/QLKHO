@@ -1,0 +1,166 @@
+@page "/qlkho/quan-ly-nguoi-dung"
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+<Authorized>
+    <!-- Bảng chính hiển thị **NhanVien** -->
+    <Table TItem="NhanVien"
+           TableTitle="nhân viên"
+           AddNew="false"
+           query="@query"
+
+           OnDelete="@(args => Delete((NhanVien)args))"
+           OnReloadData="@(args => GetData((List<NhanVien>)args))"
+           OnSearch ="@(args => SearchVoid((string)args))"
+           widthForm="60vw" heightForm="60vh"
+           @ref="GTable">
+
+        <!-- Vùng tìm kiếm nâng cao -->
+        <AddMore>
+            <RadzenCard Style="width:99%;margin-top:2%">
+                <div class="row">
+                    <RadzenLabel Style="font-weight:bold; font-size:large"
+                                 Text="Thông tin tìm kiếm"/>
+                </div>
+
+                <div class="row">
+                    <FormField Text="Nhóm" Size="6">
+                        <RadzenDropDown Multiple
+                                        @bind-Value="listNhomSelect"
+                                        Data="listNhom"
+                                        TextProperty="TenNhom" ValueProperty="IdNhom"
+                                        AllowFiltering AllowClear
+                                        Style="width:100%"/>
+                    </FormField>
+                </div>
+
+                <div class="row">
+                            <div class="row justify-content-center" style="margin-top: 3rem">
+                                <div class="col-12 col-lg-12 d-flex align-items-center justify-content-center" style="bottom: 0%;width: 100%; background-color: transparent; height: 8%;">
+                                <RadzenButton Icon="search" ButtonStyle="ButtonStyle.Success" Text="Tìm kiếm"
+                                    Click="@(args => SearchData())" Style="margin-right:1%;" />
+                                <RadzenButton Icon="refresh" ButtonStyle="ButtonStyle.Info" Text="Làm mới" Click="@(args => Clear())"
+                                    Style="margin-right:1%;" />
+                            </div>
+
+                        </div>
+                </div>
+            </RadzenCard>
+        </AddMore>
+
+        <!-- Các cột -->
+        <MoreColumns>
+            <RadzenDataGridColumn TItem="NhanVien" Title="Tên đăng nhập"
+                                  Width="200px" Sortable="false">
+                <Template Context="nv">
+                    @(listNguoiDung.FirstOrDefault(nd => nd.MaNV == nv.MaNV)?.Username ?? "" )
+                </Template>
+            </RadzenDataGridColumn>
+
+            <RadzenDataGridColumn TItem="NhanVien" Title="Họ tên"
+                                  Property="TenNV" Width="200px" />
+                                  
+            <RadzenDataGridColumn TItem="NhanVien" Title="Mật khẩu"
+                                  Width="200px" Sortable="false">
+                <Template Context="nv">
+                    @(listNguoiDung.FirstOrDefault(nd => nd.MaNV == nv.MaNV)?.Password ?? "" )
+                </Template>
+            </RadzenDataGridColumn>
+            <!-- Thao tác chi tiết -->
+        </MoreColumns>
+
+        <FormDialog Context="nv">
+            <QuanLyTaiKhoan_Detail record="nv"/>
+        </FormDialog>
+    </Table>
+</Authorized>
+</AuthorizeView>
+
+@code{
+    /*------------- FIELD -------------*/
+    Table<NhanVien>        GTable         = default!;
+    IQueryable<NhanVien>   query          = default!;
+
+    List<Nhom>             listNhom       = new();
+    List<int>              listNhomSelect = new();
+    List<NguoiDung>        listNguoiDung  = new();
+
+    /*------------- INIT -------------*/
+    protected override void OnInitialized()
+    {
+        listNhom = db.Nhoms.AsNoTracking().ToList();
+        query    = db.NhanViens.AsNoTracking();          // → lấy tất cả nhân viên
+    }
+
+    /*------------- LOAD phụ trợ -------------*/
+    /// Lấy listNguoiDung phục vụ Template
+    protected async Task GetData(List<NhanVien> data)
+    {
+        var ids = data.Select(nv => nv.MaNV).Distinct().ToList();
+        listNguoiDung = await db.NguoiDungs
+                               .Where(nd => nd.MaNV != null && ids.Contains(nd.MaNV.Value))
+                               .AsNoTracking()
+                               .ToListAsync();
+    }
+
+    /*------------- SEARCH ô textbox -------------*/
+    protected async Task SearchVoid(string term)
+    {
+        if (string.IsNullOrWhiteSpace(term))
+        {
+            await Clear();
+            return;
+        }
+
+        var maNVSearch = await db.NguoiDungs
+                                 .Where(u => u.Username.Contains(term))
+                                 .Select(u => u.MaNV!.Value)
+                                 .ToListAsync();
+
+        query = db.NhanViens.AsNoTracking()
+                .Where(nv => nv.TenNV.Contains(term) || maNVSearch.Contains(nv.MaNV));
+
+        await GTable.ForceRefresh(query);
+    }
+
+    /*------------- TÌM KIẾM nâng cao (lọc nhóm) -------------*/
+    protected async Task SearchData()
+    {
+        query = db.NhanViens.AsNoTracking();
+
+        if (listNhomSelect.Any())
+        {
+            var maNVTheoNhom = await db.Nhom_NguoiDungs
+                                       .Where(x => listNhomSelect.Contains(x.IdNhom))
+                                       .Join(db.NguoiDungs,
+                                             g => g.IdNguoiDung,
+                                             u => u.IdNguoiDung,
+                                             (g,u) => u.MaNV)
+                                       .Where(m => m.HasValue)
+                                       .Select(m => m!.Value)
+                                       .Distinct()
+                                       .ToListAsync();
+
+            query = query.Where(nv => maNVTheoNhom.Contains(nv.MaNV));
+        }
+
+        await GTable.ForceRefresh(query);
+    }
+
+    /*------------- CLEAR -------------*/
+    protected async Task Clear()
+    {
+        listNhomSelect.Clear();
+        query = db.NhanViens.AsNoTracking();
+        await GTable.Refresh();
+    }
+
+    /*------------- DELETE (nếu cần) -------------*/
+    protected async Task Delete(NhanVien nv)
+    {
+        // tuỳ yêu cầu – xóa nhân viên hay chỉ ràng buộc?
+    }
+}

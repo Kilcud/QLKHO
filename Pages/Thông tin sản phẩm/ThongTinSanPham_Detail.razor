@@ -1,0 +1,115 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@using Newtonsoft.Json
+
+@if (!Loading)
+{
+        <Form TItem="SanPham" AddNew="true" Record=@SanPham OnSubmit=@(args => Submit((SanPham)args))>
+        <MoreForms>
+            <div class="row">
+                <FormField Size="4" Text="Tên sản phẩm">
+                    <RadzenTextBox @bind-Value="SanPham.TenSP" Name="TenSP" Style="width:100%" />
+                    <RadzenRequiredValidator Text="Không được để trống" Component="TenSP" Popup="true" />
+                </FormField>
+
+                <FormField Size="4" Text="Kho">
+                    <RadzenDropDown Disabled="false" @bind-Value=@SanPham.MaKho Data=@listKho ValueProperty="MaKho" TextProperty="TenKho" />
+                </FormField>
+
+                <FormField Size="4" Text="Loại sản phẩm">
+                    <RadzenDropDown Disabled="false" @bind-Value=@SanPham.MaLSP Data=@listLoaiSanPham ValueProperty="MaLSP" TextProperty="TenLSP" />
+                </FormField>
+
+                <FormField Text="Đơn giá nhập" Size="4">
+                    <RadzenNumeric Disabled="false" @bind-Value="SanPham.DonGiaNhap" Min="0" Step="1000" Style="width:100%" />
+                </FormField>
+
+                <FormField Text="Đơn giá xuất" Size="4">
+                    <RadzenNumeric Disabled="false" @bind-Value="SanPham.DonGiaXuat" Min="0" Step="1000" Style="width:100%" />
+                </FormField>
+
+                <FormField Size="6" Text="Hạn sử dụng">
+                    <RadzenDatePicker Disabled="false" @bind-Value=@SanPham.HSD DateFormat="dd/MM/yyyy" />
+                </FormField>
+
+            </div>
+        </MoreForms>
+    </Form>
+}
+else
+{
+        <LoadingDialog />
+}
+
+
+@code {
+    [Parameter] public string title { get; set; } = "";
+    [Parameter] public SanPham record { get; set; } = default!;
+
+    SanPham SanPham = new SanPham();
+    bool Loading = true;
+    int count;
+
+    List<Kho> listKho = new List<Kho>();
+    List<LoaiSanPham> listLoaiSanPham = new List<LoaiSanPham>();
+
+    protected override async Task OnInitializedAsync()
+    {
+        listKho = await db.Khos.ToListAsync();
+        listLoaiSanPham = await db.LoaiSanPhams.ToListAsync();
+        if (record.MaSP != 0)
+        {
+            SanPham = await db.SanPhams.FirstOrDefaultAsync<SanPham>(item => item.MaSP == record.MaSP)
+            ?? new SanPham();
+        }
+        Loading = false;
+    }
+
+    protected async Task Submit(SanPham obj)
+    {
+        try
+        {
+            var confirmResult = await dialog.Confirm
+            (
+            $"Chắc chắn muốn lưu thông tin ?",
+            "Xác nhận thông tin",
+            new ConfirmOptions()
+                {
+                    OkButtonText = "Đồng ý",
+                    CancelButtonText = "Hủy",
+                    Width = "400px"
+                }
+            );
+
+            if (!confirmResult.HasValue || !confirmResult.Value)
+            {
+                return;
+            }            
+
+            if (obj.MaSP == 0)
+            {
+                db.SanPhams.Add(obj);
+                await db.SaveChangesAsync(); 
+                notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+                }
+            else
+            {
+                db.SanPhams.Update(obj);
+                await db.SaveChangesAsync();
+                notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+            }
+
+            dialog.Close(obj);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_SanPham_TenSP_Norm") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Trùng tên", "Sản phẩm này đã tồn tại!", 4000);
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"{e}", null, duration: -1);
+        }
+    }
+}

@@ -1,0 +1,151 @@
+@page "/qlkho/thong-ke-ton-kho"
+
+@inject QLKHOContext db
+@inject NotificationService notificationService
+@layout QLKHO.Shared.MainLayout
+@attribute [Authorize]
+
+@if (!perms.CanView)
+    {
+        <p class="text-danger">Bạn không có quyền xem thống kê tồn kho.</p>
+    }
+else
+{
+<AuthorizeView>
+    <Authorized>
+        @if (tonKhoGroupedByKho == null)
+        {
+            <p>Đang tải dữ liệu...</p>
+        }
+        else
+        {
+            @foreach (var khoGroup in tonKhoGroupedByKho)
+            {
+                <div class="row" style="margin-bottom:20px; margin-top: 10px">
+                    <div class="col-md-12">
+                        <RadzenLabel
+                            Style="text-align: center;color: rgb(10, 10, 178); font-family: 'Source Sans 3', sans-serif ; font-weight: bold; width: 100%; font-size: 25px "
+                            Text= "@( "Danh sách hàng tồn kho " + khoGroup.Key )">
+                        </RadzenLabel>
+                    </div>
+                </div>
+                <div style="padding-bottom: 2rem;">
+                    <div class="col-11" style="margin-left:2.5rem" >
+                        <RadzenDataGrid Data="@khoGroup.ToList()" TItem="TonKhoDto" GridLines="DataGridGridLines.Both" AllowColumnResize="true" AllowPaging="false" AllowSorting="false" AllowFiltering="false" Style="--rz-grid-header-font-size: 1rem; --rz-grid-cell-font-size: 1rem" EmptyText="Không có dữ liệu">
+                            <Columns>
+                                <RadzenDataGridColumn TItem="TonKhoDto" Property="TenSP" Title="Tên sản phẩm" Width="100px" />
+                                <RadzenDataGridColumn TItem="TonKhoDto" Property="SoLuongTon" Title="Số lượng tồn" Width="100px" />
+                                <RadzenDataGridColumn TItem="TonKhoDto" Property="DonViTinh" Title="Đơn vị tính" Width="100px" />
+                            </Columns>
+                        </RadzenDataGrid>
+                    </div>
+                </div>
+            }
+        }
+    </Authorized>
+</AuthorizeView>
+}
+
+@code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+    
+    IEnumerable<IGrouping<string, TonKhoDto>>? tonKhoGroupedByKho;
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadData();
+    }
+
+    private async Task LoadData()
+    {
+        var dvtSanPhamList = await db.DVT_SanPhams.ToListAsync();
+
+        // Lấy tổng nhập nhóm theo MaSP, MaKho
+        var nhapQuery = from ct in db.ChiTietPhieuNhaps
+                        group ct by new { ct.MaSP, MaKho = ct.MaPNNavigation.MaKho } into g
+                        select new
+                        {
+                            g.Key.MaSP,
+                            g.Key.MaKho,
+                            NhapDetails = g.ToList()
+                        };
+
+        // Lấy tổng xuất nhóm theo MaSP, MaKho
+        var xuatQuery = from ct in db.ChiTietPhieuXuats
+                        group ct by new { ct.MaSP, MaKho = ct.MaPXNavigation.MaKho } into g
+                        select new
+                        {
+                            g.Key.MaSP,
+                            g.Key.MaKho,
+                            XuatDetails = g.ToList()
+                        };
+
+        var nhapList = await nhapQuery.ToListAsync();
+        var xuatList = await xuatQuery.ToListAsync();
+
+        var tonKhoList = nhapList.Select(n =>
+        {
+            // Tính tổng nhập quy đổi
+            int tongNhapQuyDoi = n.NhapDetails.Sum(ct =>
+            {
+                var dvt = dvtSanPhamList.FirstOrDefault(d => d.MaSP == ct.MaSP && d.MaDVT == ct.MaDVT);
+                int heSo = dvt != null && !dvt.LaMacDinh ? (dvt.HeSoQuyDoi != 0 ? dvt.HeSoQuyDoi : 1) : 1;
+                return ct.SoLuongNhap * heSo;
+            });
+
+            // Tìm tổng xuất tương ứng
+            var xuat = xuatList.FirstOrDefault(x => x.MaSP == n.MaSP && x.MaKho == n.MaKho);
+
+            // Tính tổng xuất quy đổi
+            int tongXuatQuyDoi = xuat != null ? xuat.XuatDetails.Sum(ct =>
+            {
+                var dvt = dvtSanPhamList.FirstOrDefault(d => d.MaSP == ct.MaSP && d.MaDVT == ct.MaDVT);
+                int heSo = dvt != null && !dvt.LaMacDinh ? (dvt.HeSoQuyDoi != 0 ? dvt.HeSoQuyDoi : 1) : 1;
+                return ct.SoLuongXuat * heSo;
+            }) : 0;
+
+            return new
+            {
+                n.MaSP,
+                n.MaKho,
+                SoLuongTon = tongNhapQuyDoi - tongXuatQuyDoi
+            };
+        })
+        .Where(t => t.SoLuongTon > 0)
+        .ToList();
+
+        var sanPhams = await db.SanPhams.ToListAsync();
+        var khoList = await db.Khos.ToListAsync();
+
+        // Lấy đơn vị tính mặc định
+        var dvtMacDinhList = dvtSanPhamList.Where(d => d.LaMacDinh).ToList();
+        var donViTinhs = await db.DonViTinhs.ToListAsync();
+
+        var result = (from tk in tonKhoList
+                    join sp in sanPhams on tk.MaSP equals sp.MaSP
+                    join kho in khoList on tk.MaKho equals kho.MaKho
+                    join dvtsp in dvtMacDinhList on sp.MaSP equals dvtsp.MaSP into dvtJoin
+                    from dvtsp in dvtJoin.DefaultIfEmpty()
+                    join dvt in donViTinhs on dvtsp.MaDVT equals dvt.MaDVT into dvtNameJoin
+                    from dvt in dvtNameJoin.DefaultIfEmpty()
+                    select new TonKhoDto
+                    {
+                        TenSP = sp.TenSP,
+                        TenKho = kho.TenKho,
+                        SoLuongTon = tk.SoLuongTon,
+                        DonViTinh = dvt != null ? dvt.TenDVT : ""
+                    }).ToList();
+
+        tonKhoGroupedByKho = result.GroupBy(x => x.TenKho);
+
+        await InvokeAsync(StateHasChanged);
+    }
+
+    public class TonKhoDto
+    {
+        public string TenSP { get; set; } = string.Empty;
+        public string TenKho { get; set; } = string.Empty;
+        public int SoLuongTon { get; set; }
+        public string DonViTinh { get; set; } = string.Empty;
+    }
+}

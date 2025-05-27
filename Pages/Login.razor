@@ -1,0 +1,166 @@
+@page "/qlkho/login"
+@page "/qlkho/"
+@page "/"
+@layout LoginLayout
+@using System.DirectoryServices
+@using QLKHO.Services
+@inject QLKHOContext db
+@inject NavigationManager UriHelper
+@inject NotificationService notificationService
+@using QLKHO.Authentication
+@inject AuthenticationStateProvider authStateProvider
+@inject CustomAuthenticationStateProvider AuthProv
+@using System.Security.Claims
+
+<PageTitle>Đăng nhập hệ thống</PageTitle>
+<AuthorizeView>
+    <Authorized>
+        <RedirectToHome />
+    </Authorized>
+    <NotAuthorized>
+        <div class="login min-vh-100 sm:py-16 bg-secondary-100 flex-column">
+            <div class="row justify-content-center align-items-center">
+                <div class="col-6" style="width: 45%">
+                    <div class="card shadow-2-strong" style="border-radius: 0.5rem">
+                        <div class="card-body p-8">
+                            <div style="display: flex; align-items: center; justify-content: center">
+                                <img src="logo.png"
+                                    style="height:90px;width:auto; margin: 20 20 20 0; padding-right: 30px;" />
+                                <div class="text-center">
+                                     <strong style="font-size: 1.7rem; color: #112572">HỆ THỐNG QUẢN LÝ HÀNG TỒN KHO</strong>
+                                    <br />
+                                   <span style="font-size: 1rem">Môn học: ATCSDL</span>
+
+
+                                </div>
+                            </div>
+                            <div style="margin-left: 2rem; margin-right: 1.7rem">
+                                <RadzenTemplateForm TItem="LoginModel" Data=@loginModel Submit="@Authenticate">
+                                    <ChildContent Context="ctx">
+                                    <RadzenFormField style="width: 100%; margin-top: 1.5rem" Text="Tên tài khoản">
+                                        <Start>
+                                            <RadzenIcon Icon="account_circle" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="loginModel.Username" />
+                                        </ChildContent>
+                                    </RadzenFormField>
+                                    <RadzenFormField style="width: 100%; margin-top:1.5rem" Text="Mật khẩu">
+                                        <Start>
+                                            <RadzenIcon Icon="lock" />
+                                        </Start>
+                                        <ChildContent>
+                                            <RadzenTextBox @bind-Value="loginModel.Password" Visible="@(!viewPassword)" />
+                                            <RadzenPassword @bind-Value="loginModel.Password" Visible="@viewPassword" />
+                                        </ChildContent>
+                                        <End>
+                                            <RadzenButton Icon="@(viewPassword ? "visibility" : "visibility_off")"
+                                                Click="TogglePassword" Variant="Variant.Text" Size="ButtonSize.Small" />
+                                        </End>
+                                    </RadzenFormField>
+                                    <div style="margin-top: 1.5rem">
+                                        <RadzenCheckBox @bind-Value="loginModel.RememberMe" Name="save_login" />
+                                        <RadzenLabel Text="Ghi nhớ đăng nhập" Component="save_login"
+                                            Style="margin-left: 8px; vertical-align: middle;" />
+                                    </div>
+                                    <RadzenButton style="margin-top: 1.5rem; width: 100%; background-color:#112572 "
+                                        class="rz-info-darker" Text="Đăng nhập" ButtonType="ButtonType.Submit">
+                                    </RadzenButton>
+                                    </ChildContent>
+
+                                </RadzenTemplateForm>
+
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            </div>
+        </div>
+    </NotAuthorized>
+</AuthorizeView>
+
+
+
+@code {
+    bool viewPassword = true;
+    void TogglePassword()
+    {
+        viewPassword = !viewPassword;
+    }
+    class LoginModel
+    {
+        public string Username { get; set; } = "";
+        public string Password { get; set; } = "";
+        public bool RememberMe { get; set; }
+    }
+
+    LoginModel loginModel = new();
+
+    async Task Authenticate()
+    {
+        // 1. Xác thực
+        var user = await db.NguoiDungs
+                            .FirstOrDefaultAsync(u =>
+                                u.Username == loginModel.Username
+                            && u.Password == loginModel.Password);
+        if (user == null)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Lỗi", "Tên tài khoản hoặc mật khẩu không đúng!");
+            return;
+        }
+
+        // 2. Lấy nhóm và quyền
+        var groupIds = await db.Nhom_NguoiDungs
+                                .Where(n => n.IdNguoiDung == user.IdNguoiDung)
+                                .Select(n => n.IdNhom)
+                                .ToListAsync();
+
+        var perms = await db.Nhom_ChucNangs
+                            .Where(nc => groupIds.Contains(nc.IdNhom))
+                            .Select(nc => new {
+                                nc.IdChucNang,
+                                nc.AllowView,
+                                nc.AllowAdd,
+                                nc.AllowEdit,
+                                nc.AllowDelete
+                            })
+                            .ToListAsync();
+
+        // 3. Build claims
+        var claims = new List<Claim>
+        {
+            new Claim(ClaimTypes.Name,           user.Username),
+            new Claim(ClaimTypes.NameIdentifier, user.IdNguoiDung.ToString()),
+            new Claim("IdNhanVien",              (user.MaNV ?? 0).ToString())
+        };
+
+        foreach (var p in perms)
+        {
+            var ops = new List<string>();
+            if (p.AllowView)   ops.Add("View");
+            if (p.AllowAdd)    ops.Add("Add");
+            if (p.AllowEdit)   ops.Add("Edit");
+            if (p.AllowDelete) ops.Add("Del");
+
+            if (ops.Count > 0)
+            {
+                claims.Add(new Claim(
+                    $"Func_{p.IdChucNang}",
+                    string.Join(",", ops)
+                ));
+            }
+        }
+
+        // 4. Đăng nhập
+        await AuthProv.SignInAsync(claims, loginModel.RememberMe);
+        notificationService.Notify(NotificationSeverity.Success,
+            "Thành công", "Đăng nhập thành công!");
+
+        // 5. Chuyển về trang Home
+        UriHelper.NavigateTo("/qlkho/home", true);
+
+    }
+
+}

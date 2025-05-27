@@ -1,0 +1,104 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@using Newtonsoft.Json
+
+@if (!Loading)
+{
+        <Form TItem="NhaCungCap" AddNew="true" Record=@NhaCungCap OnSubmit=@(args => Submit((NhaCungCap)args))>
+        <MoreForms>
+            <div class="row">
+                <FormField Size="4" Text="Tên nhà cung cấp">
+                    <RadzenTextBox @bind-Value="NhaCungCap.TenNCC" Name="TenNCC" Style="width:100%" />
+                    <RadzenRequiredValidator Text="Không được để trống" Component="TenNCC" Popup="true" />
+                </FormField>
+
+                <FormField Size="4" Text="Số điện thoại">
+                    <RadzenTextBox @bind-Value="NhaCungCap.SDTNCC" Name="SDTNCC" Style="width:100%" /> 
+                    <RadzenRequiredValidator Text="Không được để trống" Component="SDTNCC" Popup="true" />
+                </FormField>
+
+                <FormField Size="4" Text="Địa chỉ">
+                    <RadzenTextBox @bind-Value="NhaCungCap.DiaChiNCC" Name="DiaChiNCC" Style="width:100%" />
+                    <RadzenRequiredValidator Text="Không được để trống" Component="DiaChiNCC" Popup="true" />
+                </FormField>
+            </div>
+        </MoreForms>
+    </Form>
+}
+else
+{
+        <LoadingDialog />
+}
+
+
+@code {
+    [Parameter] public string title { get; set; } = "";
+    [Parameter] public NhaCungCap record { get; set; } = default!;
+
+    NhaCungCap NhaCungCap = new NhaCungCap();
+    bool Loading = true;
+    int count;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (record.MaNCC != 0)
+        {
+            NhaCungCap = await db.NhaCungCaps.FirstOrDefaultAsync<NhaCungCap>(item => item.MaNCC == record.MaNCC)
+            ?? new NhaCungCap();
+        }
+        Loading = false;
+    }
+
+    protected async Task Submit(NhaCungCap obj)
+    {
+        try
+        {
+            var confirmResult = await dialog.Confirm
+            (
+            $"Chắc chắn muốn lưu thông tin ?",
+            "Xác nhận thông tin",
+            new ConfirmOptions()
+                {
+                    OkButtonText = "Đồng ý",
+                    CancelButtonText = "Hủy",
+                    Width = "400px"
+                }
+            );
+
+            if (!confirmResult.HasValue || !confirmResult.Value)
+            {
+                return;
+            }            
+
+            if (obj.MaNCC == 0)
+            {
+                db.NhaCungCaps.Add(obj);
+                await db.SaveChangesAsync(); 
+                notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+                }
+            else
+            {
+                db.NhaCungCaps.Update(obj);
+                await db.SaveChangesAsync();
+                notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+            }
+
+            dialog.Close(obj);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_NhaCungCap_TenNCC_Norm") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Trùng tên", "Nhà cung cấp này đã tồn tại!", 4000);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("CK_SDTNCC_OnlyDigits") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Lỗi số điện thoại", "Số điện thoại phải có 10 số và chỉ được chứa ký tự số!", 4000);
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"{e}", null, duration: -1);
+        }
+    }
+}

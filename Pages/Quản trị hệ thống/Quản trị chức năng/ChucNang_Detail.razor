@@ -1,0 +1,109 @@
+@inject QLKHOContext db
+@inject Radzen.DialogService dialog
+@inject NotificationService notificationService
+@inject NavigationManager UriHelper
+@using QLKHO.components
+
+<RadzenTemplateForm TItem="ChucNang" Data="Data" Submit="@(obj => Submit((ChucNang)obj))">
+    <div class="row">
+        <div class="col-12">
+            <FormField Text="Tên chức năng">
+                
+                    <RadzenTextBox @bind-Value="@Data.TenChucNang"></RadzenTextBox>
+                
+            </FormField>
+            <FormField Text="Đường dẫn">
+                
+                    <RadzenTextBox @bind-Value="@Data.DuongDan"></RadzenTextBox>
+                
+            </FormField>
+            <FormField Text="Biểu tượng">
+                
+                    <RadzenTextBox @bind-Value="@Data.Icon"></RadzenTextBox>
+                
+            </FormField>
+
+
+        </div>
+    </div>
+    <div style="float: right; margin-top: 10px;">
+        <RadzenButton Style="margin-right: 10px" ButtonType="ButtonType.Submit">Lưu</RadzenButton>
+        <RadzenButton ButtonStyle="ButtonStyle.Light" Click="@(() => ReturnChucNang.InvokeAsync(null))">Hủy
+        </RadzenButton>
+    </div>
+</RadzenTemplateForm>
+
+@code {
+    [Parameter] public ChucNang Record { set; get; } = default!;
+    [Parameter] public EventCallback<ChucNang> ReturnChucNang { set; get; }
+    [Parameter] public int? ThemCungCap { set; get; }
+    ChucNang Data = new ChucNang();
+
+    bool ChucNangCon = false;
+
+    protected override void OnInitialized()
+    {
+        Data = db.ChucNangs.Where(item => item.IdChucNang == Record.IdChucNang).FirstOrDefault() ?? new ChucNang();
+        if (Data == null)
+        {
+            Data = new ChucNang();
+            if (Record.IdChucNangCha != null)
+            {
+                Data.IdChucNangCha = Record.IdChucNangCha;
+                //ChucNangCon = true;
+            }
+        }
+        else
+        {
+            ChucNangCon = Data.IdChucNangCha != null;
+        }
+        base.OnInitialized();
+    }
+
+    void Submit(ChucNang obj)
+    {
+        if (ChucNangCon == false)
+        {
+            obj.IdChucNangCha = null;
+        }
+        if (Record.IdChucNang == 0)
+        {
+            if (Record.IdChucNangCha == null)
+            {
+                ChucNang ChucNangTren = db.ChucNangs.Where(item => item.IdChucNang == (ThemCungCap.HasValue ?
+                ThemCungCap.Value : 0)).FirstOrDefault() ??
+                new ChucNang();
+                List<ChucNang> listChucNangSau = db.ChucNangs.Where(item => item.IdChucNangCha == ChucNangTren.IdChucNangCha
+                &&
+                item.STT > ChucNangTren.STT).ToList();
+                for (int i = 0; i < listChucNangSau.Count; i++)
+                {
+                    listChucNangSau[i].STT = listChucNangSau[i].STT + 1;
+                }
+                listChucNangSau.ForEach(item =>
+                {
+                    db.ChucNangs.Update(item);
+                });
+                obj.IdChucNangCha = ChucNangTren.IdChucNangCha;
+                obj.STT = ChucNangTren.STT + 1;
+            }
+            if (Record.IdChucNangCha != null)
+            {
+                List<ChucNang> listCungCap = db.ChucNangs.Where(item => item.IdChucNangCha == ThemCungCap).ToList();
+                obj.IdChucNangCha = ThemCungCap;
+                obj.STT = listCungCap.Count > 0 ? listCungCap[listCungCap.Count - 1].STT + 1 : 1;
+            }
+
+            db.ChucNangs.Add(obj);
+            db.SaveChanges();
+            notificationService.Notify(NotificationSeverity.Success, "Lưu thành công", null, duration: 1500);
+        }
+        else
+        {
+            db.ChucNangs.Update(obj);
+            db.SaveChanges();
+            notificationService.Notify(NotificationSeverity.Success, "Lưu thành công", null, duration: 1500);
+        }
+        ReturnChucNang.InvokeAsync(obj);
+    }
+}

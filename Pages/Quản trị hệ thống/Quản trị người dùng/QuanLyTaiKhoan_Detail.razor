@@ -1,0 +1,173 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@using System.Text.RegularExpressions;
+@using QLKHO.Services
+
+<RadzenTemplateForm TItem="NguoiDung" Data=@NguoiDung Submit="@Authenticate">
+    <ChildContent Context="ctx">
+        <div class="container-fluid">
+            <div class="row">
+                <div class="col-md-12">
+                    <RadzenFormField style="width: 100%; margin-top: 1.5rem" Text="Tên tài khoản">
+                        <Start>
+                            <RadzenIcon Icon="account_circle" />
+                        </Start>
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="@NguoiDung.Username" Disabled="false" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </div>
+
+                <div class="col-md-12">
+                    <RadzenFormField style="width: 100%; margin-top: 1.5rem" Text="Mật khẩu">
+                        <Start>
+                            <RadzenIcon Icon="lock" />
+                        </Start>
+                        <ChildContent>
+                            <RadzenTextBox @bind-Value="@NguoiDung.Password" Disabled="false" />
+                        </ChildContent>
+                    </RadzenFormField>
+                </div>
+                
+                <FormField Size="12" Text="Nhóm người dùng">
+                    <RadzenDropDown @bind-Value=@listSelect Data=@listNhom TextProperty="TenNhom" ValueProperty="IdNhom"
+                        Multiple=true AllowClear=true Chips=true Style="width: 100%;" />
+                </FormField>
+                <div class="col-md-3 mx-auto text-center">
+                    <RadzenButton style="margin-top: 1.5rem; width: 100%; background-color:#112572 "
+                        class="rz-info-darker" Text=@txtButton ButtonType="ButtonType.Submit">
+                    </RadzenButton>
+                </div>
+
+            </div>
+        </div>
+    </ChildContent>
+
+</RadzenTemplateForm>
+@code {
+    [Parameter] public NhanVien record { get; set; } = default!;
+
+    string passwordValue = "";
+    NguoiDung NguoiDung = new NguoiDung();
+    List<Nhom> listNhom = new List<Nhom>();
+    List<int> listSelect = new List<int>();
+    NhanVien NhanVien = new NhanVien();
+    NhanVien currentNV = new NhanVien();
+    string txtButton  = "Thêm mới";
+    protected override async Task OnInitializedAsync()
+    {
+        currentNV = record;
+        listNhom = await db.Nhoms.AsNoTracking().ToListAsync();        
+        
+        if (record.MaNV != 0)
+        {            
+            NguoiDung = await db.NguoiDungs
+                                .Include(u => u.Nhom_NguoiDungs)
+                                .FirstOrDefaultAsync(u => u.MaNV == record.MaNV)
+                        ?? new NguoiDung { MaNV = record.MaNV };
+
+            listSelect = NguoiDung.Nhom_NguoiDungs
+                                   .Select(x => x.IdNhom)
+                                   .ToList();
+
+            txtButton  = NguoiDung.IdNguoiDung == 0 ? "Thêm mới" : "Cập nhật";
+        }
+    }
+
+    private bool ValidatePassword(string pwd, out string error)
+    {
+        error = "";
+
+        // 1) Độ phức tạp
+        var complexityPattern = @"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$";
+        if (!Regex.IsMatch(pwd, complexityPattern))
+        {
+            error = "Mật khẩu phải có ít nhất 8 ký tự, bao gồm chữ hoa, chữ thường, chữ số và ký tự đặc biệt.";
+            return false;
+        }
+
+        // 2) Không chứa username hoặc họ tên
+        if (!string.IsNullOrWhiteSpace(NguoiDung.Username) &&
+            pwd.IndexOf(NguoiDung.Username, StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            error = "Mật khẩu không được chứa tên đăng nhập.";
+            return false;
+        }
+
+        // 3) Không chứa tên nhân viên (TenNV)
+        if (!string.IsNullOrWhiteSpace(currentNV.TenNV) &&
+            pwd.IndexOf(currentNV.TenNV, StringComparison.OrdinalIgnoreCase) >= 0)
+        {
+            error = "Mật khẩu không được chứa tên nhân viên.";
+            return false;
+        }
+
+        return true;
+    }
+
+    private async Task Authenticate()
+    {
+        try
+        {
+            // 0. Validate mật khẩu
+            if (!ValidatePassword(NguoiDung.Password, out var errorMessage))
+            {
+                notificationService.Notify(
+                    NotificationSeverity.Error,
+                    "Mật khẩu không hợp lệ",
+                    errorMessage,
+                    4000
+                );
+                return;
+            }
+
+            /******** 1. Thêm / Cập nhật bảng NguoiDung ********/
+            bool isNew = NguoiDung.IdNguoiDung == 0;
+
+            if (isNew)
+            {
+                /// TODO: Hash mật khẩu trước khi lưu!
+                db.NguoiDungs.Add(NguoiDung);
+            }
+            else
+            {
+                db.NguoiDungs.Update(NguoiDung);
+            }
+
+            await db.SaveChangesAsync();            // => IdNguoiDung mới đã có
+
+            /******** 2. Cập nhật bảng Nhom_NguoiDung ********/
+            // xoá liên kết cũ
+            var olds = await db.Nhom_NguoiDungs
+                            .Where(x => x.IdNguoiDung == NguoiDung.IdNguoiDung)
+                            .ToListAsync();
+            db.Nhom_NguoiDungs.RemoveRange(olds);
+
+            // thêm liên kết mới
+            foreach (int idNhom in listSelect.Distinct())
+            {
+                db.Nhom_NguoiDungs.Add(new Nhom_NguoiDung
+                {
+                    IdNguoiDung = NguoiDung.IdNguoiDung,
+                    IdNhom      = idNhom,
+                    CreateAt    = DateTime.Now        // nếu bảng có cột này
+                });
+            }
+
+            await db.SaveChangesAsync();
+
+            /******** 3. Thông báo & đóng dialog ********/
+            notificationService.Notify(NotificationSeverity.Success,
+                "Thông báo", $"{txtButton} thành công", 3000);
+
+            dialog.Close(NhanVien);    // trả về bản ghi để Grid refresh
+        }
+        catch (Exception ex)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Lỗi", ex.Message, 5000);
+        }
+    }
+
+}

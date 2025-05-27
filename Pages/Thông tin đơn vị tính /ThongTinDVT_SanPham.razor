@@ -1,0 +1,120 @@
+@page "/qlkho/thong-tin-dvt-san-pham"
+
+@inject QLKHOContext db
+@inject DialogService dialog
+@layout QLKHO.Shared.MainLayout
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <Table TItem="DVT_SanPham" TableTitle=@title query=@query
+            OnDelete="@(args => Delete((DVT_SanPham)args))" OnSearch="@(args => SearchVoid((string)args))"
+            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh" 
+            AddNew="perms.CanAdd"
+            EditFunction="perms.CanEdit"
+            DeleteFunction="perms.CanDelete" 
+            HasOperation="perms.CanEdit && perms.CanDelete">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="DVT_SanPham" Title="Tên sản phẩm" Sortable="false" Width="100px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(listSanPham.Where(item => item.MaSP == ctx.MaSP).FirstOrDefault()?.TenSP ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="DVT_SanPham" Sortable="false" Title="Đơn vị tính" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(listDonViTinh.Where(item => item.MaDVT == ctx.MaDVT).FirstOrDefault()?.TenDVT ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="DVT_SanPham" Sortable="false" Title="Hệ số quy đổi" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.HeSoQuyDoi.ToString()) />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="DVT_SanPham" Sortable="false" Title="Là mặc định" Width="30px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.LaMacDinh ? "Mặc định" : "" )/>
+                    </Template>
+                </RadzenDataGridColumn>   
+
+
+            </MoreColumns>
+            
+            <FormDialog Context="ctx">
+                <ThongTinDVT_SanPham_Detail title=@title record="ctx" />
+            </FormDialog>
+        </Table>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    IQueryable<DVT_SanPham> query = default!;
+    Table<DVT_SanPham> GTable = default!;
+    string title = "đơn vị tính theo sản phẩm";
+
+    List<SanPham> listSanPham = new List<SanPham>();
+    
+    List<DonViTinh> listDonViTinh = new List<DonViTinh>();
+
+    protected override void OnInitialized()
+    {
+        query = db.DVT_SanPhams.AsNoTracking().AsQueryable() ?? Enumerable.Empty<DVT_SanPham>().AsQueryable();
+        listSanPham = db.SanPhams.ToList();
+        listDonViTinh = db.DonViTinhs.ToList();
+    }
+
+    protected async Task Delete(DVT_SanPham record)
+    {
+        try
+        {
+            db.DVT_SanPhams.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", $"Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
+        }
+    }
+
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        if (string.IsNullOrWhiteSpace(SearchTerm))
+        {
+            // Reset về tất cả
+            query = db.DVT_SanPhams
+                    .AsNoTracking();
+        }
+        else
+        {
+            // 1) Lấy danh sách ID sản phẩm có tên chứa SearchTerm
+            var matchingIds = await db.SanPhams
+                .Where(sp => sp.TenSP.Contains(SearchTerm))
+                .Select(sp => sp.MaSP)
+                .ToListAsync();
+
+            // 2) Lọc DVT_SanPham dựa trên những MaSP đó
+            query = db.DVT_SanPhams
+                    .Where(d => matchingIds.Contains(d.MaSP))
+                    .AsNoTracking();
+        }
+
+        await GTable.Refresh();
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.DVT_SanPhams.AsNoTracking().AsQueryable()
+        ??
+        Enumerable.Empty<DVT_SanPham>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+}

@@ -1,0 +1,121 @@
+@page "/qlkho/thong-tin-phieu-xuat"
+
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+@inherits QLKHO.components.AuthorizedPageBase
+
+<AuthorizeView>
+    <Authorized>
+        <Table TItem="PhieuXuat" TableTitle=@title query=@query
+            OnDelete="@(args => Delete((PhieuXuat)args))" OnSearch="@(args => SearchVoid((string)args))"
+            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh"
+            AddNew="perms.CanAdd"
+            EditFunction="perms.CanEdit"
+            DeleteFunction="perms.CanDelete" 
+            HasOperation="perms.CanEdit && perms.CanDelete">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="PhieuXuat" Title="Tên phiếu xuất" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@("PX" + ctx.MaPX.ToString("D2")) />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="PhieuXuat" Sortable="false" Title="Kho" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(listKho.Where(item => item.MaKho == ctx.MaKho).FirstOrDefault()?.TenKho ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="PhieuXuat" Sortable="false" Title="Nhân viên" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(listNhanVien.Where(item => item.MaNV == ctx.MaNV).FirstOrDefault()?.TenNV ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="PhieuXuat" Sortable="false" Title="Cửa hàng" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(listCuaHang.Where(item => item.MaCH == ctx.MaCH).FirstOrDefault()?.TenCH ?? "") />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="PhieuXuat" Title="Giá xuất" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        @(String.Format("{0:N0}", ctx.GiaXuat) + " đ") <!-- Định dạng tiền tệ -->
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="PhieuXuat" Title="Ngày xuất" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        @(ctx.NgayXuat.ToString("dd/MM/yyyy"))
+                    </Template>
+                </RadzenDataGridColumn>
+
+            </MoreColumns>
+            
+            <FormDialog Context="ctx">
+                <ThongTinPhieuXuat_Detail title=@title record="ctx" />
+            </FormDialog>
+        </Table>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    IQueryable<PhieuXuat> query = default!;
+    List<Kho> listKho = new List<Kho>();
+    List<NhanVien> listNhanVien = new List<NhanVien>();
+    List<CuaHang> listCuaHang = new List<CuaHang>();
+
+    Table<PhieuXuat> GTable = default!;
+    string title = "phiếu xuất";
+    protected override void OnInitialized()
+    {
+        query = db.PhieuXuats.AsNoTracking().AsQueryable() ?? Enumerable.Empty<PhieuXuat>().AsQueryable();
+        listKho = db.Khos.ToList();
+        listNhanVien = db.NhanViens.ToList();
+        listCuaHang = db.CuaHangs.ToList();
+    }
+
+    protected async Task Delete(PhieuXuat record)
+    {
+        try
+        {
+            // Xóa các chi tiết phiếu nhập liên quan
+            var chiTietList = db.ChiTietPhieuXuats.Where(ct => ct.MaPX == record.MaPX);
+            db.ChiTietPhieuXuats.RemoveRange(chiTietList);
+
+            // Xóa phiếu nhập
+            db.PhieuXuats.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", $"Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
+        }
+    }
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        @* query = db.PhieuXuats.Where(item => item.TenPN != null &&
+        item.TenLSP.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<PhieuXuat>().AsQueryable();
+
+        await GTable.Refresh(); *@
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.PhieuXuats.AsNoTracking().AsQueryable()
+        ??
+        Enumerable.Empty<PhieuXuat>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+}

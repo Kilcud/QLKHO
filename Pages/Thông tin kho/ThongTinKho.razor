@@ -1,0 +1,91 @@
+@page "/qlkho/thong-tin-kho"
+
+@inject QLKHOContext db
+@inject DialogService dialog
+@layout QLKHO.Shared.MainLayout
+@inject NotificationService notificationService
+@attribute [Authorize]
+
+<AuthorizeView>
+    <Authorized>
+        <Table TItem="Kho" TableTitle=@title query=@query
+            OnDelete="@(args => Delete((Kho)args))" OnSearch="@(args => SearchVoid((string)args))"
+            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh" 
+            AddNew="perms.CanAdd"
+            EditFunction="perms.CanEdit"
+            DeleteFunction="perms.CanDelete" 
+            HasOperation="perms.CanEdit && perms.CanDelete">
+            <MoreColumns>
+                <RadzenDataGridColumn TItem="Kho" Title="Tên kho" Sortable="false" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.TenKho) />
+                    </Template>
+                </RadzenDataGridColumn>
+
+                <RadzenDataGridColumn TItem="Kho" Sortable="false" Title="Hotline" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.SDTKho) />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+                <RadzenDataGridColumn TItem="Kho" Sortable="false" Title="Địa chỉ" Width="50px">
+                    <Template Context="ctx">
+                        <WrapWord Data=@(ctx.DiaChiKho) />
+                    </Template>
+                </RadzenDataGridColumn>   
+
+            </MoreColumns>
+            
+            <FormDialog Context="ctx">
+                <ThongTinKho_Detail title=@title record="ctx" />
+            </FormDialog>
+        </Table>
+    </Authorized>
+</AuthorizeView>
+
+@code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    IQueryable<Kho> query = default!;
+    Table<Kho> GTable = default!;
+    string title = "cửa hàng";
+
+    protected override async Task OnInitializedAsync()
+    {
+        query = db.Khos.AsNoTracking().AsQueryable() ?? Enumerable.Empty<Kho>().AsQueryable();
+    }
+
+    protected async Task Delete(Kho record)
+    {
+        try
+        {
+            db.Khos.Remove(record);
+            await db.SaveChangesAsync();
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", $"Đã xóa dữ liệu", duration: 1500);
+
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
+        }
+    }
+
+    protected async Task SearchVoid(string SearchTerm)
+    {
+        query = db.Khos.Where(item => item.TenKho != null &&
+        item.TenKho.Contains(SearchTerm)).AsQueryable() ??
+        Enumerable.Empty<Kho>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+    protected async Task ResetVoid()
+    {
+        query = db.Khos.AsNoTracking().AsQueryable()
+        ??
+        Enumerable.Empty<Kho>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+}

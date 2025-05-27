@@ -1,0 +1,559 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@using Newtonsoft.Json
+
+@if (!Loading)
+{
+        <Form TItem="PhieuXuat" AddNew="true" Record=@PhieuXuat OnSubmit=@(args => Submit((PhieuXuat)args))>
+        <MoreForms>
+            <div class="row">
+                <FormField Size="4" Text="Kho">
+                    <RadzenDropDown Disabled="false" @bind-Value=@PhieuXuat.MaKho Data=@listKho ValueProperty="MaKho" TextProperty="TenKho" Change="@(async args => await OnKhoChanged((int)args))" />
+                </FormField>
+
+                <FormField Size="4" Text="Nhân viên">
+                    <RadzenDropDown Disabled="false" @bind-Value=@PhieuXuat.MaNV Data=@listNhanVien ValueProperty="MaNV" TextProperty="TenNV" />
+
+                </FormField>
+
+                <FormField Size="4" Text="Cửa hàng">
+                    <RadzenDropDown Disabled="false" @bind-Value=@PhieuXuat.MaCH Data=@listCuaHang ValueProperty="MaCH" TextProperty="TenCH" />
+                </FormField>
+
+                <FormField Text="Giá xuất" Size="4">
+                    <RadzenNumeric Disabled="true" @bind-Value="PhieuXuat.GiaXuat" Min="0" Step="1000" Style="width:100%" />
+                </FormField>
+
+                <FormField Size="6" Text="Ngày xuất">
+                    <RadzenDatePicker Disabled="true" @bind-Value=@PhieuXuat.NgayXuat DateFormat="dd/MM/yyyy" />
+                </FormField>
+
+                <div class="col-12">
+                    <Inline_NoLoad @ref="inline" @key="PhieuXuat.MaKho" AddNew="true" TItem="ChiTietPhieuXuat" listData="@listChiTietPhieuXuat" TableTitle="sản phẩm trong phiếu" OnCreate="(data => Create((ChiTietPhieuXuat)data))" OnUpdate="(data => Update((ChiTietPhieuXuat)data.Item1, (int)data.Item2))" OnDelete="(data => Delete((ChiTietPhieuXuat)data))" OnProductChanged="OnProductChanged">
+                        <MoreColumns>
+                            <RadzenDataGridColumn TItem="ChiTietPhieuXuat" Sortable="false" Title="Sản phẩm" Width="100px" TextAlign="TextAlign.Left">
+                                <Template Context="ctx">
+                                    @(listSanPham.Where(item => item.MaSP == ctx.MaSP).FirstOrDefault()?.TenSP ?? "")
+                                </Template>
+                                <EditTemplate Context="ctx">
+                                    <RadzenDropDown Style="width:100%" @bind-Value=@ctx.MaSP Data=@listDataSanPham
+                                                    Count="@count" AllowVirtualization="true" AllowClear="true" AllowFiltering="true"
+                                                    TextProperty="TenSP" ValueProperty="MaSP" 
+                                                    Change="@(args => OnProductChanged(ctx, (int)args))"/>
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+
+                            <RadzenDataGridColumn TItem="ChiTietPhieuXuat" Sortable="false" Title="Số lượng xuất" Width="100px" TextAlign="TextAlign.Left">
+                                <Template Context="ctx">
+                                    @(ctx.SoLuongXuat)
+                                </Template>
+                                <EditTemplate Context="ctx">
+                                    <RadzenNumeric @bind-Value=@ctx.SoLuongXuat Min="1" Step="1" Style="width:100%" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>
+
+                            <RadzenDataGridColumn TItem="ChiTietPhieuXuat" Sortable="false" Title="Đơn vị tính" Width="80px" TextAlign="TextAlign.Left">
+                                <Template Context="ctx">
+                                    @(listDonViTinh.Where(item => item.MaDVT == ctx.MaDVT).FirstOrDefault()?.TenDVT ?? "")
+                                </Template>
+                                <EditTemplate Context="ctx">
+                                    <RadzenDropDown Style="width:100%" @bind-Value=@ctx.MaDVT 
+                                                    Data="DonViTinhTheoSanPham.ContainsKey(ctx.MaSP) ? DonViTinhTheoSanPham[ctx.MaSP] : new List<DonViTinh>()"
+                                                    Count="@count" 
+                                                    AllowVirtualization="true" AllowClear="true" AllowFiltering="true"
+                                                    TextProperty="TenDVT" ValueProperty="MaDVT" />
+                                </EditTemplate>
+                            </RadzenDataGridColumn>                            
+                            
+                        </MoreColumns>
+                    </Inline_NoLoad>
+                </div>
+            </div>
+        </MoreForms>
+    </Form>
+}
+else
+{
+        <LoadingDialog />
+}
+
+
+@code {
+    [Parameter] public string title { get; set; } = "";
+    [Parameter] public PhieuXuat record { get; set; } = default!;
+
+    PhieuXuat PhieuXuat = new PhieuXuat();
+    List<Kho> listKho = new List<Kho>();
+    List<NhanVien> listNhanVien = new List<NhanVien>();
+    List<CuaHang> listCuaHang = new List<CuaHang>();
+    
+    List<ChiTietPhieuXuat> listChiTietPhieuXuat = new List<ChiTietPhieuXuat>();
+    List<SanPham> listSanPham = new List<SanPham>();
+    List<SanPham> listDataSanPham = new List<SanPham>();
+    List<DonViTinh> listDonViTinh = new List<DonViTinh>();
+    List<DonViTinh> listDataDonViTinh = new List<DonViTinh>();
+    Dictionary<int, List<DonViTinh>> DonViTinhTheoSanPham = new Dictionary<int, List<DonViTinh>>();
+
+    Inline_NoLoad<ChiTietPhieuXuat> inline = default!;
+    bool Loading = true;
+    int count;
+
+    // biến giữ Kho lúc bắt đầu (dùng để so sánh khi Edit)
+    int originalMaKho;
+    protected override async Task OnInitializedAsync()
+    {
+        listKho = await db.Khos.ToListAsync();
+        listNhanVien = await db.NhanViens.ToListAsync();
+        listCuaHang = await db.CuaHangs.ToListAsync();
+        listSanPham = await db.SanPhams.ToListAsync();
+        listDonViTinh = await db.DonViTinhs.ToListAsync();
+        
+        var dvtSanPham = await db.DVT_SanPhams.ToListAsync();
+
+            foreach (var sp in listSanPham)
+            {
+                var dvtList = dvtSanPham.Where(x => x.MaSP == sp.MaSP)
+                                    .Select(x => listDonViTinh.FirstOrDefault(d => d.MaDVT == x.MaDVT))
+                                    .Where(d => d != null).ToList()!;
+                DonViTinhTheoSanPham[sp.MaSP] = dvtList;
+            }
+
+        if (record.MaPX != 0)
+        {
+            PhieuXuat = await db.PhieuXuats.FirstOrDefaultAsync<PhieuXuat>(item => item.MaPX == record.MaPX)
+            ?? new PhieuXuat();
+            listChiTietPhieuXuat = await db.ChiTietPhieuXuats.Where(item => item.MaPX == PhieuXuat.MaPX).ToListAsync();
+            List<int> listMaSP = listChiTietPhieuXuat.Select(item => item.MaSP).ToList();
+            listSanPham = await db.SanPhams.Where(item => listMaSP.Contains(item.MaSP)).ToListAsync();
+
+            List<int> listMaDVT = listChiTietPhieuXuat.Select(item => item.MaDVT).ToList();
+            listDonViTinh = await db.DonViTinhs.Where(item => listMaDVT.Contains(item.MaDVT)).ToListAsync();
+        }
+        else
+        {
+            // trường hợp thêm mới: khởi tạo với NgayXuat = hôm nay
+            PhieuXuat = new PhieuXuat
+            {
+                MaKho    = listKho.FirstOrDefault()?.MaKho  ?? 0,
+                MaNV     = listNhanVien.FirstOrDefault()?.MaNV ?? 0,
+                MaCH     = listCuaHang.FirstOrDefault()?.MaCH  ?? 0,
+                NgayXuat = DateTime.Now
+            };
+            originalMaKho = PhieuXuat.MaKho;
+            listChiTietPhieuXuat = new List<ChiTietPhieuXuat>();
+        }
+        await FilterProductsByKho(PhieuXuat.MaKho);
+        Loading = false;
+    }
+
+    protected async Task Submit(PhieuXuat obj)
+    {
+        try
+        {
+            if (listChiTietPhieuXuat == null || !listChiTietPhieuXuat.Any())
+            {
+                notificationService.Notify(
+                    NotificationSeverity.Error,
+                    "Chưa có sản phẩm nào trong phiếu, không thể lưu.",
+                    null,
+                    duration: 3000
+                );
+                return;   // dừng, không tiếp tục lưu
+            }
+
+            var confirmResult = await dialog.Confirm
+            (
+            $"Chắc chắn muốn lưu thông tin ?",
+            "Xác nhận thông tin",
+            new ConfirmOptions()
+                {
+                    OkButtonText = "Đồng ý",
+                    CancelButtonText = "Hủy",
+                    Width = "400px"
+                }
+            );
+
+            if (!confirmResult.HasValue || !confirmResult.Value)
+            {
+                return;
+            }
+
+            decimal tongGiaXuat = 0m;
+
+            // Lấy dữ liệu DVT_SanPham từ db (hoặc cache nếu bạn đã load rồi)
+            var listDVT_SanPham = await db.DVT_SanPhams.ToListAsync();
+
+            foreach (var chiTiet in listChiTietPhieuXuat)
+            {
+                var sp = listSanPham.FirstOrDefault(s => s.MaSP == chiTiet.MaSP);
+                if (sp == null) continue;
+
+                // Tìm đơn vị tính trong bảng DVT_SanPham tương ứng
+                var dvt_sp = listDVT_SanPham.FirstOrDefault(d =>
+                    d.MaSP == chiTiet.MaSP && d.MaDVT == chiTiet.MaDVT);
+
+                if (dvt_sp != null)
+                {
+                    if (dvt_sp.LaMacDinh)
+                    {
+                        // Đơn vị tính mặc định, không nhân hệ số quy đổi
+                        tongGiaXuat += sp.DonGiaXuat * chiTiet.SoLuongXuat;
+                    }
+                    else
+                    {
+                        // Nếu HeSoQuyDoi bằng 0 thì lấy 1
+                        int heSo = dvt_sp.HeSoQuyDoi != 0 ? dvt_sp.HeSoQuyDoi : 1;
+                        tongGiaXuat += sp.DonGiaXuat * chiTiet.SoLuongXuat * heSo;
+                    }
+                }
+                else
+                {
+                    // Nếu không tìm thấy, mặc định nhân đơn giá với số lượng
+                    tongGiaXuat += sp.DonGiaXuat * chiTiet.SoLuongXuat;
+                }
+            }
+
+            obj.GiaXuat = tongGiaXuat;
+            
+            if (obj.MaPX == 0)
+            {
+                db.PhieuXuats.Add(obj);
+                await db.SaveChangesAsync();
+
+                // Thêm các Chi Tiết Phiếu Nhập
+                foreach (var chiTiet in listChiTietPhieuXuat)
+                {
+                    chiTiet.MaPX = obj.MaPX; // Gán MaPX cho ChiTietPhieuXuat
+                    db.ChiTietPhieuXuats.Add(chiTiet); // Thêm Chi Tiết vào bảng
+                }
+                await db.SaveChangesAsync(); 
+
+                notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+                }
+            else
+            {
+                 // 1) Cập nhật chính thông tin Phiếu
+                db.PhieuXuats.Update(obj);
+                await db.SaveChangesAsync();
+
+                // 2) Xóa các chi tiết cũ mà user đã gỡ khỏi form
+                var dbDetails = await db.ChiTietPhieuXuats
+                                        .Where(ct => ct.MaPX == obj.MaPX)
+                                        .ToListAsync();
+                var toDelete = dbDetails
+                            .Where(dbct => !listChiTietPhieuXuat
+                                                .Any(lt => lt.MaSP == dbct.MaSP))
+                            .ToList();
+                if (toDelete.Any())
+                {
+                    db.ChiTietPhieuXuats.RemoveRange(toDelete);
+                    await db.SaveChangesAsync();
+                }
+                
+                // 3) Cập nhật các chi tiết còn lại hoặc thêm mới
+                foreach (var chiTiet in listChiTietPhieuXuat)
+                {
+                    // Nếu chi tiết chưa có trong bảng ChiTietPhieuXuat, thêm mới
+                    var existingChiTiet = await db.ChiTietPhieuXuats
+                        .FirstOrDefaultAsync(c => c.MaPX == obj.MaPX && c.MaSP == chiTiet.MaSP);
+
+                    if (existingChiTiet == null)
+                    {
+                        // Nếu không tìm thấy, thêm mới
+                        chiTiet.MaPX = obj.MaPX;
+                        db.ChiTietPhieuXuats.Add(chiTiet);
+                    }
+                    else
+                    {
+                        // Nếu đã tồn tại, cập nhật chi tiết
+                        existingChiTiet.MaDVT = chiTiet.MaDVT;
+                        existingChiTiet.SoLuongXuat = chiTiet.SoLuongXuat;
+                        db.ChiTietPhieuXuats.Update(existingChiTiet);
+                    }
+                }
+
+                listChiTietPhieuXuat = await db.ChiTietPhieuXuats
+                                   .Where(ct => ct.MaPX == obj.MaPX)
+                                   .ToListAsync();
+                await FilterProductsByKho(obj.MaKho);
+                await inline.ReloadTable();
+
+                await db.SaveChangesAsync(); // Lưu các chi tiết phiếu nhập đã cập nhật
+
+                notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+            }
+
+            dialog.Close(obj);
+        }
+        catch (InvalidOperationException ex)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi trùng dữ liệu: {ex.Message}", null, 4000);
+        }
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"{e}", null, duration: -1);
+        }
+    }
+
+    void OnSanPhamChanged(ChiTietPhieuXuat ct, int maSP)
+    {
+        ct.MaSP = maSP;
+
+        if (DonViTinhTheoSanPham.TryGetValue(maSP, out var dvtList))
+        {
+            // Nếu MaDVT hiện tại không nằm trong danh sách đơn vị tính của sản phẩm thì reset
+            if (!dvtList.Any(d => d.MaDVT == ct.MaDVT))
+            {
+                ct.MaDVT = 0; // hoặc null nếu kiểu dữ liệu cho phép
+            }
+        }
+        else
+        {
+            // Nếu sản phẩm không có đơn vị tính nào trong dictionary thì reset
+            ct.MaDVT = 0;
+        }
+    }
+
+    void OnProductChanged(ChiTietPhieuXuat ct, int newMaSP)
+    {
+        OnSanPhamChanged(ct, newMaSP);
+        StateHasChanged();
+    }
+
+
+    protected async Task Create(ChiTietPhieuXuat record)
+    {
+        try
+        {
+            if (record.SoLuongXuat <= 0)
+            {
+                notificationService.Notify(NotificationSeverity.Error,
+                    "Số lượng xuất phải lớn hơn 0.", null, 3000);
+                db.Entry(record).State = EntityState.Detached;
+                await inline.CancelEdit(record);
+                await inline.ReloadTable();
+                return;
+            }
+
+            int maKho = PhieuXuat.MaKho;
+
+            // Tính tồn kho đã quy đổi
+            int tonKho = TinhTonKho(record.MaSP, maKho);
+
+            // Lấy hệ số quy đổi cho đơn vị tính hiện tại
+            var dvtSp = await db.DVT_SanPhams.FirstOrDefaultAsync(d => d.MaSP == record.MaSP && d.MaDVT == record.MaDVT);
+            if (dvtSp == null)
+            {
+                notificationService.Notify(NotificationSeverity.Error,
+                    $"Đơn vị tính chưa hợp lệ.", null, 4000);
+                db.Entry(record).State = EntityState.Detached;
+                await inline.CancelEdit(record);
+                await inline.ReloadTable();
+                return;
+            }
+
+            int heSo = dvtSp.LaMacDinh ? 1 : (dvtSp.HeSoQuyDoi != 0 ? dvtSp.HeSoQuyDoi : 1);
+            int soLuongXuatQuyDoi = record.SoLuongXuat * heSo;
+
+            if (soLuongXuatQuyDoi > tonKho)
+            {
+                notificationService.Notify(NotificationSeverity.Error,
+                    $"Số lượng xuất (quy đổi) {soLuongXuatQuyDoi} vượt tồn kho hiện tại {tonKho}.", null, 4000);
+                db.Entry(record).State = EntityState.Detached;
+                await inline.CancelEdit(record);
+                await inline.ReloadTable();
+                return;
+            }
+
+            // Kiểm tra trùng sản phẩm trong danh sách chi tiết
+            if (listChiTietPhieuXuat.Any(c => c.MaSP == record.MaSP))
+            {
+                var sp = listSanPham.FirstOrDefault(s => s.MaSP == record.MaSP);
+                notificationService.Notify(NotificationSeverity.Error,
+                    $"Sản phẩm '{sp?.TenSP ?? record.MaSP.ToString()}' đã tồn tại trong phiếu xuất. Vui lòng chọn sản phẩm khác.", null, 4000);
+                db.Entry(record).State = EntityState.Detached;
+                await inline.CancelEdit(record);
+                await inline.ReloadTable();
+                return;
+            }
+
+            listChiTietPhieuXuat.Add(record);
+            
+            var sp1 = await db.SanPhams.FindAsync(record.MaSP);
+            if (sp1 != null) listSanPham.Add(sp1);
+
+            notificationService.Notify(NotificationSeverity.Success, "Thêm mới sản phẩm thành công", null, duration: 2000);
+
+            await inline.ReloadTable();
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: -1);
+        }
+    }
+
+    protected async Task Update(ChiTietPhieuXuat record, int index)
+    {
+        try
+        {
+            int maKho = PhieuXuat.MaKho;
+
+            // Tính tồn kho quy đổi (loại trừ phiếu xuất hiện tại)
+            int tonKho = TinhTonKho(record.MaSP, maKho, excludeMaPX: PhieuXuat.MaPX);
+
+            // Lấy hệ số quy đổi cho đơn vị tính hiện tại
+            var dvtSp = await db.DVT_SanPhams.FirstOrDefaultAsync(d => d.MaSP == record.MaSP && d.MaDVT == record.MaDVT);
+            if (dvtSp == null)
+            {
+                notificationService.Notify(NotificationSeverity.Error,
+                    $"Đơn vị tính chưa hợp lệ.", null, 4000);
+                await inline.CancelEdit(record);
+                await inline.ReloadTable();
+                return;
+            }
+
+            int heSo = dvtSp.LaMacDinh ? 1 : (dvtSp.HeSoQuyDoi != 0 ? dvtSp.HeSoQuyDoi : 1);
+            int soLuongXuatQuyDoi = record.SoLuongXuat * heSo;
+
+            if (soLuongXuatQuyDoi > tonKho)
+            {
+                notificationService.Notify(NotificationSeverity.Error,
+                    $"Số lượng xuất (quy đổi) {soLuongXuatQuyDoi} vượt tồn kho hiện tại {tonKho}.", null, 4000);
+                await inline.CancelEdit(record);
+                await inline.ReloadTable();
+                return;
+            }
+
+            // Cập nhật chi tiết sản phẩm trong listChiTietPhieuXuat
+            listChiTietPhieuXuat[index] = record;
+
+            notificationService.Notify(NotificationSeverity.Success, "Cập nhật sản phẩm thành công", null, duration: 2000);
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, "Lỗi khi lưu dữ liệu", null, duration: -1);
+        }
+    }
+    protected void Delete(ChiTietPhieuXuat record)
+    {
+        try
+        {
+            listChiTietPhieuXuat.Remove(record);
+            notificationService.Notify(NotificationSeverity.Info, $"Thông báo:", "Đã xóa dữ liệu", duration: 1500);
+        }
+        catch
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu", duration: -1);
+        }
+    }
+
+    private int TinhTonKho(int maSP, int maKho, int? excludeMaPX = null)
+    {
+        // Lấy danh sách DVT_SanPham để biết hệ số quy đổi và đơn vị mặc định
+        var dvtSanPhamList = db.DVT_SanPhams.Where(d => d.MaSP == maSP).ToList();
+
+        // Lấy đơn vị tính mặc định
+        var dvtMacDinh = dvtSanPhamList.FirstOrDefault(d => d.LaMacDinh);
+
+        // Nếu không có đơn vị tính mặc định, coi heSo = 1
+        int heSoMacDinh = dvtMacDinh != null ? (dvtMacDinh.HeSoQuyDoi != 0 ? dvtMacDinh.HeSoQuyDoi : 1) : 1;
+
+        // Tính tổng nhập: quy đổi tất cả các đơn vị về đơn vị mặc định
+        var tongNhap = db.ChiTietPhieuNhaps
+            .Where(ct => ct.MaSP == maSP && ct.MaPNNavigation.MaKho == maKho)
+            .AsEnumerable()  // chuyển sang xử lý ở client để dùng C#
+            .Sum(ct =>
+            {
+                var dvt = dvtSanPhamList.FirstOrDefault(d => d.MaDVT == ct.MaDVT);
+                int heSo = dvt != null && !dvt.LaMacDinh ? (dvt.HeSoQuyDoi != 0 ? dvt.HeSoQuyDoi : 1) : 1;
+                return ct.SoLuongNhap * heSo;
+            });
+
+        // Tính tổng xuất (loại trừ phiếu xuất đang sửa nếu có)
+        var queryXuat = db.ChiTietPhieuXuats
+            .Where(ct => ct.MaSP == maSP && ct.MaPXNavigation.MaKho == maKho);
+
+        if (excludeMaPX.HasValue)
+            queryXuat = queryXuat.Where(ct => ct.MaPX != excludeMaPX.Value);
+
+        var tongXuat = queryXuat
+            .AsEnumerable()
+            .Sum(ct =>
+            {
+                var dvt = dvtSanPhamList.FirstOrDefault(d => d.MaDVT == ct.MaDVT);
+                int heSo = dvt != null && !dvt.LaMacDinh ? (dvt.HeSoQuyDoi != 0 ? dvt.HeSoQuyDoi : 1) : 1;
+                return ct.SoLuongXuat * heSo;
+            });
+
+        return tongNhap - tongXuat;
+    }
+
+    async Task OnKhoChanged(int newMaKho)
+    {
+        if (record.MaPX != 0 && newMaKho != originalMaKho && listChiTietPhieuXuat.Any())
+        {
+            // Hỏi người dùng có chắc chắn không
+            bool ok = await dialog.Confirm(
+            "Đổi kho sẽ xóa tất cả sản phẩm trong phiếu cũ, bạn có chắc?",
+            "Xác nhận đổi kho",
+            new ConfirmOptions { OkButtonText = "Đồng ý", CancelButtonText = "Hủy", Width = "400px" }
+            ) ?? false;
+
+            if (!ok)
+            {
+                // nếu hủy, trả dropdown về kho cũ
+                PhieuXuat.MaKho = originalMaKho;
+                StateHasChanged();
+                return;
+            }
+
+            // nếu đồng ý, xoá chi tiết để thêm mới
+            listChiTietPhieuXuat.Clear();
+            // đồng thời, bạn có thể reset inline table nếu cần
+        }
+
+        PhieuXuat.MaKho = newMaKho;
+
+        // mỗi lần đổi kho → lọc lại sản phẩm + đơn vị tính
+        await FilterProductsByKho(newMaKho);
+
+        // Nếu đang edit một row, reload để template rebuild dropdown
+        await inline.ReloadTable();
+
+        StateHasChanged();
+    }
+
+    async Task FilterProductsByKho(int kho)
+    {
+        // load toàn bộ sản phẩm + DVT_SanPham + DonViTinh
+        var allSp    = await db.SanPhams.ToListAsync();
+        var dvtSp    = await db.DVT_SanPhams.ToListAsync();
+        var allDVT   = await db.DonViTinhs.ToListAsync();
+
+        listDataSanPham = new();
+
+        // tính tồn kho quy đổi cho mỗi sp
+        foreach (var sp in allSp)
+        {
+        var ton = TinhTonKho(sp.MaSP, kho);
+        if (ton > 0) 
+        {
+            listDataSanPham.Add(sp);
+        }
+        }
+
+        // rebuild dictionary đơn vị tính chỉ cho sản phẩm đang còn trong kho
+        DonViTinhTheoSanPham = listDataSanPham
+        .ToDictionary(
+            sp => sp.MaSP,
+            sp => dvtSp
+                    .Where(d => d.MaSP == sp.MaSP)
+                    .Select(d => allDVT.First(dt => dt.MaDVT == d.MaDVT))
+                    .ToList()
+        );
+    }
+
+
+
+}
