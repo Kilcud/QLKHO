@@ -1,17 +1,17 @@
 {
   "format": 1,
   "restore": {
-    "/Users/kilcud/Desktop/ATCSDL/QLKHO/QLKHO.csproj": {}
+    "/Users/kilcud/Desktop/QLKHO/QLKHO.csproj": {}
   },
   "projects": {
-    "/Users/kilcud/Desktop/ATCSDL/QLKHO/QLKHO.csproj": {
+    "/Users/kilcud/Desktop/QLKHO/QLKHO.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "/Users/kilcud/Desktop/ATCSDL/QLKHO/QLKHO.csproj",
+        "projectUniqueName": "/Users/kilcud/Desktop/QLKHO/QLKHO.csproj",
         "projectName": "QLKHO",
-        "projectPath": "/Users/kilcud/Desktop/ATCSDL/QLKHO/QLKHO.csproj",
+        "projectPath": "/Users/kilcud/Desktop/QLKHO/QLKHO.csproj",
         "packagesPath": "/Users/kilcud/.nuget/packages/",
-        "outputPath": "/Users/kilcud/Desktop/ATCSDL/QLKHO/obj/",
+        "outputPath": "/Users/kilcud/Desktop/QLKHO/obj/",
         "projectStyle": "PackageReference",
         "configFilePaths": [
           "/Users/kilcud/.nuget/NuGet/NuGet.Config"

@@ -124,10 +124,10 @@
 
             /******** 1. Thêm / Cập nhật bảng NguoiDung ********/
             bool isNew = NguoiDung.IdNguoiDung == 0;
+            NguoiDung.Password = HashingServices.HashPassword(NguoiDung.Password);
 
             if (isNew)
             {
-                /// TODO: Hash mật khẩu trước khi lưu!
                 db.NguoiDungs.Add(NguoiDung);
             }
             else

@@ -9,7 +9,10 @@
     <Authorized>
         <Inline @ref=@inline TItem="DonViTinh" TableTitle="đơn vị tính" query=@query
             OnCreate="(data => Create((DonViTinh)data))" OnUpdate="(data => Update((DonViTinh)data))"
-            OnDelete="(data => Delete((DonViTinh)data))">
+            OnDelete="(data => Delete((DonViTinh)data))"
+            DisableAdd="!perms.CanAdd"
+            EditFunction="perms.CanEdit"
+            DeleteFunction="perms.CanDelete" HasOperation="perms.CanEdit && perms.CanDelete">
             <MoreColumns>
                 <RadzenDataGridColumn TItem="DonViTinh" Sortable="false" Title="Tên đơn vị tính" Width="640px"
                     TextAlign="TextAlign.Left" Property="TenDVT">
@@ -30,6 +33,9 @@
 </AuthorizeView>
 
 @code {
+    
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+
     IQueryable<DonViTinh> query = default!;
 
     Inline<DonViTinh> inline = default!;

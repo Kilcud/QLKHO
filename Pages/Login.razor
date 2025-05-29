@@ -103,7 +103,7 @@
         var user = await db.NguoiDungs
                             .FirstOrDefaultAsync(u =>
                                 u.Username == loginModel.Username
-                            && u.Password == loginModel.Password);
+                            && u.Password == HashingServices.HashPassword(loginModel.Password));
         if (user == null)
         {
             notificationService.Notify(NotificationSeverity.Error,

@@ -28,7 +28,7 @@
                     </Template>
                 </RadzenDataGridColumn>   
 
-                <RadzenDataGridColumn TItem="Kho" Sortable="false" Title="Địa chỉ" Width="50px">
+                <RadzenDataGridColumn TItem="Kho" Sortable="false" Title="Địa chỉ" Width="100px">
                     <Template Context="ctx">
                         <WrapWord Data=@(ctx.DiaChiKho) />
                     </Template>
@@ -48,7 +48,7 @@
     [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
     IQueryable<Kho> query = default!;
     Table<Kho> GTable = default!;
-    string title = "cửa hàng";
+    string title = "kho";
 
     protected override async Task OnInitializedAsync()
     {

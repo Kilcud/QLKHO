@@ -19,6 +19,8 @@ else
         }
         else
         {
+            <RadzenButton Text="Xuất PDF" Click="@ExportPdf" Style="margin-bottom:1rem" Icon="picture_as_pdf" />
+
             @foreach (var khoGroup in tonKhoGroupedByKho)
             {
                 <div class="row" style="margin-bottom:20px; margin-top: 10px">
@@ -49,6 +51,8 @@ else
 @code {
     [CascadingParameter] public PagePermissions perms { get; set; } = default!;
     
+    [Inject] IJSRuntime JS { get; set; } = default!;
+
     IEnumerable<IGrouping<string, TonKhoDto>>? tonKhoGroupedByKho;
 
     protected override async Task OnInitializedAsync()
@@ -140,6 +144,78 @@ else
 
         await InvokeAsync(StateHasChanged);
     }
+
+    private async Task ExportPdf()
+    {
+        // Tạo tài liệu Word mới
+        var doc = new Aspose.Words.Document();
+        var builder = new Aspose.Words.DocumentBuilder(doc);
+
+        builder.ParagraphFormat.Alignment = Aspose.Words.ParagraphAlignment.Center;
+        builder.Font.Name = "Times New Roman";
+        builder.Font.Size = 16;
+        builder.Font.Bold = true;
+        builder.Writeln("Báo cáo tồn kho");
+
+        builder.ParagraphFormat.Alignment = Aspose.Words.ParagraphAlignment.Left;
+        builder.Font.Size = 12;
+        builder.Font.Bold = false;
+        builder.Writeln($"Ngày xuất báo cáo: {DateTime.Now:dd/MM/yyyy HH:mm}");
+
+        foreach (var khoGroup in tonKhoGroupedByKho)
+        {
+            builder.Writeln();
+            builder.Font.Bold = true;
+            builder.Writeln($"Kho: {khoGroup.Key}");
+            builder.Font.Bold = false;
+
+            // Tạo bảng trong tài liệu
+            var table = builder.StartTable();
+
+            // Header bảng
+            builder.InsertCell();
+            builder.ParagraphFormat.Alignment = Aspose.Words.ParagraphAlignment.Center;
+            builder.Font.Bold = true;
+            builder.Write("Tên sản phẩm");
+            builder.InsertCell();
+            builder.Write("Số lượng tồn");
+            builder.InsertCell();
+            builder.Write("Đơn vị tính");
+            builder.EndRow();
+
+            builder.Font.Bold = false;
+
+            // Dữ liệu từng dòng
+            foreach (var item in khoGroup)
+            {
+                builder.InsertCell();
+                builder.Write(item.TenSP);
+                builder.InsertCell();
+                builder.Write(item.SoLuongTon.ToString());
+                builder.InsertCell();
+                builder.Write(item.DonViTinh);
+                builder.EndRow();
+            }
+
+            builder.EndTable();
+        }
+
+        // Lưu ra file pdf tạm thời trên server
+        string fileName = $"BaoCaoTonKho_{DateTime.Now:yyyyMMddHHmmss}.pdf";
+        string filePath = Path.Combine("wwwroot", "reports", fileName);
+
+        // Tạo thư mục reports nếu chưa có
+        if (!Directory.Exists(Path.Combine("wwwroot", "reports")))
+            Directory.CreateDirectory(Path.Combine("wwwroot", "reports"));
+
+        var options = new Aspose.Words.Saving.PdfSaveOptions();
+        options.EmbedFullFonts = true; // thử nhúng font
+        doc.Save(filePath, options);
+
+        // Mở file PDF trên tab mới client
+        await JS.InvokeVoidAsync("open", $"/reports/{fileName}", "_blank");
+    }
+
 
     public class TonKhoDto
     {

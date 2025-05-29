@@ -1,0 +1,160 @@
+@inject QLKHOContext db
+@inject DialogService dialog
+@inject NotificationService notificationService
+@using Newtonsoft.Json
+
+@if (!Loading)
+{
+        <Form TItem="DVT_SanPham" AddNew="true" Record=@DVT_SanPham OnSubmit=@(args => Submit((DVT_SanPham)args))>
+        <MoreForms>
+            <div class="row">
+                <FormField Size="4" Text="Tên sản phẩm">
+                    <RadzenDropDown Disabled="false" @bind-Value=@DVT_SanPham.MaSP Data=@listSanPham ValueProperty="MaSP" TextProperty="TenSP" />
+                </FormField>
+
+                <FormField Size="4" Text="Đơn vị tính">
+                    <RadzenDropDown Disabled="false" @bind-Value=@DVT_SanPham.MaDVT Data=@listDonViTinh ValueProperty="MaDVT" TextProperty="TenDVT" />
+                </FormField>
+
+                <FormField Size="4" Text="Hệ số quy đổi">
+                    <RadzenNumeric @bind-Value="DVT_SanPham.HeSoQuyDoi" TValue="int" Name="HeSoQuyDoi" Style="width:100%" />
+                    <RadzenRequiredValidator Text="Không được để trống" Component="HeSoQuyDoi" Popup="true" />
+                </FormField>
+
+            </div>
+        </MoreForms>
+    </Form>
+}
+else
+{
+        <LoadingDialog />
+}
+
+
+@code {
+    [Parameter] public string title { get; set; } = "";
+    [Parameter] public DVT_SanPham record { get; set; } = default!;
+
+    DVT_SanPham DVT_SanPham = new DVT_SanPham();
+    bool Loading = true;
+
+    List<SanPham> listSanPham = new List<SanPham>();
+    List<DonViTinh> listDonViTinh = new List<DonViTinh>();
+
+    // chỉ các đơn vị tính của sản phẩm được chọn
+    List<DonViTinh> availableUnits = new();
+    bool isSingleUnit;
+    string singleUnitName = "";
+
+
+
+    protected override async Task OnInitializedAsync()
+    {
+        listSanPham = await db.SanPhams.ToListAsync();
+        listDonViTinh = await db.DonViTinhs.ToListAsync();
+
+        if (record.MaSP != 0)
+        {
+            // Chế độ sửa: load record cũ
+            DVT_SanPham = await db.DVT_SanPhams.FirstOrDefaultAsync<DVT_SanPham>(item => item.MaSP == record.MaSP)
+            ?? new DVT_SanPham();
+        }
+        else
+        {
+            // Chế độ thêm mới: khởi tạo mặc định chọn phần tử đầu
+            DVT_SanPham = new DVT_SanPham
+            {
+                MaSP  = listSanPham.FirstOrDefault()?.MaSP ?? 0,
+                MaDVT = listDonViTinh.FirstOrDefault()?.MaDVT ?? 0,
+                HeSoQuyDoi = 1
+            };
+        }
+
+        Loading = false;
+    }
+
+    protected async Task Submit(DVT_SanPham obj)
+    {
+        // 0. Kiểm tra duplicate MaSP + MaDVT
+        bool duplicateUnit = await db.DVT_SanPhams
+            .AnyAsync(d =>
+                d.MaSP  == obj.MaSP
+            && d.MaDVT == obj.MaDVT
+            );
+
+        if (duplicateUnit)
+        {
+            notificationService.Notify(
+                NotificationSeverity.Error,
+                "Lỗi trùng đơn vị",
+                "Sản phẩm này đã có đơn vị tính bạn chọn rồi.",
+                4000
+            );
+            return;
+        }
+
+        // 1. Kiểm tra xem đã có đơn vị mặc định (HeSoQuyDoi == 1) cho sản phẩm này chưa
+        bool hasDefault = await db.DVT_SanPhams
+            .AnyAsync(d => d.MaSP == obj.MaSP 
+                        && d.HeSoQuyDoi == 1 
+                        // loại trừ trường hợp đang sửa chính bản ghi default (nếu edit)
+                        && d.MaDVT != obj.MaDVT);
+
+        // 2. Nếu có default rồi, thì hệ số quy đổi của bản mới/phải luôn > 1
+        if (hasDefault && obj.HeSoQuyDoi <= 1)
+        {
+            notificationService.Notify(
+                NotificationSeverity.Error,
+                "Không hợp lệ",
+                "Sản phẩm này đã có đơn vị mặc định rồi, bạn phải chọn hệ số quy đổi > 1.",
+                4000
+            );
+            return;
+        }
+
+        try
+        {
+            var confirmResult = await dialog.Confirm
+            (
+            $"Chắc chắn muốn lưu thông tin ?",
+            "Xác nhận thông tin",
+            new ConfirmOptions()
+                {
+                    OkButtonText = "Đồng ý",
+                    CancelButtonText = "Hủy",
+                    Width = "400px"
+                }
+            );
+
+            if (!confirmResult.HasValue || !confirmResult.Value)
+            {
+                return;
+            }            
+
+            if (obj.MaSP == 0)
+            {
+                db.DVT_SanPhams.Add(obj);
+                await db.SaveChangesAsync(); 
+                notificationService.Notify(NotificationSeverity.Success, "Thêm mới thành công", null, duration: 2000);
+                }
+            else
+            {
+                db.DVT_SanPhams.Update(obj);
+                await db.SaveChangesAsync();
+                notificationService.Notify(NotificationSeverity.Success, "Cập nhật thành công", null, duration: 2000);
+            }
+
+            dialog.Close(obj);
+        }
+        catch (DbUpdateException ex) when (ex.InnerException?.Message.Contains("UX_DVT_SanPham_TenCH_Norm") == true)
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Trùng tên", "Cửa hàng này đã tồn tại!", 4000);
+        }
+       
+        catch (Exception e)
+        {
+            notificationService.Notify(NotificationSeverity.Error, $"{e}", null, duration: -1);
+        }
+    }
+}

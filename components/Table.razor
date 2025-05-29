@@ -7,8 +7,6 @@
 @using System.Linq.Dynamic.Core;
 @using System.Reflection;
 
-@AddMore
-
 @* Hiện title của bảng *@
 <div class="row" style="margin-bottom:30px; margin-top: 10px">
     <div class="col-md-12">
@@ -19,33 +17,25 @@
     </div>
 </div>
 
-<div style="margin-bottom:5px; margin-right: 1rem" class="row">
+<div style="justify-content:space-between; margin-bottom:5px; margin-right: 0.5rem" class="row">
     @*Button thêm mới*@
-    <div class="col-6" style="padding: 0px">
+    <div class="col-4" style="padding: 0px; margin-left:1rem;">
         <RadzenButton Visible=@AddNew Click=@(args => AddRow()) Text="@AddBtnCaption" />
         @if (MoreButtons != null)
         {
             @MoreButtons
         }
     </div>
+
+    @AddMore
+
     @if (isSearch)
     {
-        <div class="col-6 d-flex justify-content-end">
-            <div class="row" style="width: 100%;">
-                <div class="col-10">
-                    <RadzenTextBox style="width: 100%;" @onkeydown=@(args => SearchInputKeyPressed(args))
-                        @bind-Value=@search Placeholder="Nhập thông tin để tìm kiếm" />
-                </div>
-
-                <div class="col-1">
-                    <RadzenButton style="width: 100%;" Icon="search" Click=@(args => SearchVoid()) />
-                </div>
-
-                <div class="col-1">
-                    <RadzenButton style="width: 100%;" Icon="close" Click=@(args => ResetVoid()) />
-
-                </div>
-            </div>
+        <div class="col-6 ms-auto d-flex align-items-center">
+                <RadzenTextBox style="width: 100%;" @onkeydown=@(args => SearchInputKeyPressed(args))
+                    @bind-Value=@search Placeholder="Nhập thông tin để tìm kiếm" />
+                <RadzenButton style="margin-left:0.5rem" Icon="search" Click=@(args => SearchVoid()) />
+                <RadzenButton style="margin-left:0.25rem" Icon="close" Click=@(args => ResetVoid()) />
         </div>
     }
 

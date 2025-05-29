@@ -9,7 +9,11 @@
     <Authorized>
         <Table TItem="SanPham" TableTitle=@title query=@query
             OnDelete="@(args => Delete((SanPham)args))" OnSearch="@(args => SearchVoid((string)args))"
-            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh">
+            OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh"
+            AddNew="perms.CanAdd"
+            EditFunction="perms.CanEdit"
+            DeleteFunction="perms.CanDelete" 
+            HasOperation="perms.CanEdit && perms.CanDelete">
             <MoreColumns>
                 <RadzenDataGridColumn TItem="SanPham" Title="Tên sản phẩm" Sortable="false" Width="50px">
                     <Template Context="ctx">
@@ -57,6 +61,8 @@
 </AuthorizeView>
 
 @code {
+    [CascadingParameter] public PagePermissions perms { get; set; } = default!;
+
     [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
     IQueryable<SanPham> query = default!;
     List<Kho> listKho = new List<Kho>();
