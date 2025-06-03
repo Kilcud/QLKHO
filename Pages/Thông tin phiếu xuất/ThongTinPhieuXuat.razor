@@ -10,12 +10,67 @@
 <AuthorizeView>
     <Authorized>
         <Table TItem="PhieuXuat" TableTitle=@title query=@query
-            OnDelete="@(args => Delete((PhieuXuat)args))" OnSearch="@(args => SearchVoid((string)args))"
+            OnDelete="@(args => Delete((PhieuXuat)args))"
             OnReset="@(args => ResetVoid())" @ref=@GTable widthForm="70vw" heightForm="70vh"
             AddNew="perms.CanAdd"
             EditFunction="perms.CanEdit"
             DeleteFunction="perms.CanDelete" 
-            HasOperation="perms.CanEdit && perms.CanDelete">
+            HasOperation="perms.CanEdit && perms.CanDelete" isSearch="false">
+            <AddMore>
+                    <div class="col-8 ms-auto d-flex align-items-center">
+                        <div class="row" style="width: 100%">
+                            <div class="col-md-4">
+                                <RadzenDropDown @bind-Value="selectedFilter"
+                                                Data="@filterOptions"
+                                                TextProperty="Label"
+                                                ValueProperty="Value"
+                                                Placeholder="Chọn trường lọc"
+                                                Style="width:100%" />
+                            </div>
+        
+                            @* Với text search bình thường *@
+                            @if (selectedFilter is "Kho" or "NhanVien" or "CuaHang")
+                            {
+                            <div class="col-md-6">
+                                <RadzenTextBox @bind-Value="searchTerm"
+                                            Placeholder="Nhập từ khóa"
+                                            Style="width:100%" />
+                            </div>
+                            }
+
+                            @* Với khoảng giá *@
+                            @if (selectedFilter == "GiaXuat")
+                            {
+                            <div class="col-md-3">
+                                <RadzenNumeric @bind-Value="minPrice" Placeholder="Giá từ" Style="width:100%" />
+                            </div>
+                            <div class="col-md-3">
+                                <RadzenNumeric @bind-Value="maxPrice" Placeholder="Đến"  Style="width:100%" />
+                            </div>
+                            }
+
+                            @* Với khoảng ngày *@
+                            @if (selectedFilter == "NgayXuat")
+                            {
+                            <div class="col-md-3">
+                                <RadzenDatePicker @bind-Value="fromDate" DateFormat="dd/MM/yyyy" Placeholder="Từ ngày" Style="width:100%" />
+                            </div>
+                            <div class="col-md-3">
+                                <RadzenDatePicker @bind-Value="toDate" DateFormat="dd/MM/yyyy" Placeholder="Đến ngày" Style="width:100%" />
+                            </div>
+                            }
+                    
+                            <div class="col-1">
+                                <RadzenButton Icon="search" Style="width:100%" Click="@SearchByFilter" />
+                            </div>
+
+                            <div class="col-1">
+                                <RadzenButton Icon="close" Style="width:100%" Click="@ResetVoid" />
+                            </div>
+                        </div>
+                    </div>
+                </AddMore>
+
             <MoreColumns>
                 <RadzenDataGridColumn TItem="PhieuXuat" Title="Tên phiếu xuất" Sortable="false" Width="50px">
                     <Template Context="ctx">
@@ -73,6 +128,7 @@
 
     Table<PhieuXuat> GTable = default!;
     string title = "phiếu xuất";
+    
     protected override void OnInitialized()
     {
         query = db.PhieuXuats.AsNoTracking().AsQueryable() ?? Enumerable.Empty<PhieuXuat>().AsQueryable();
@@ -100,20 +156,143 @@
             notificationService.Notify(NotificationSeverity.Error, $"Lỗi khi xoá dữ liệu: {e.Message}", duration: -1);
         }
     }
-    protected async Task SearchVoid(string SearchTerm)
-    {
-        @* query = db.PhieuXuats.Where(item => item.TenPN != null &&
-        item.TenLSP.Contains(SearchTerm)).AsQueryable() ??
-        Enumerable.Empty<PhieuXuat>().AsQueryable();
-
-        await GTable.Refresh(); *@
-    }
 
     protected async Task ResetVoid()
     {
         query = db.PhieuXuats.AsNoTracking().AsQueryable()
         ??
         Enumerable.Empty<PhieuXuat>().AsQueryable();
+
+        await GTable.Refresh();
+    }
+
+    string selectedFilter = "Kho";
+    string searchTerm = "";
+    decimal? minPrice;
+    decimal? maxPrice;
+    DateTime? fromDate;
+    DateTime? toDate;
+
+
+    List<FilterOption> filterOptions = new()
+    {
+        new("Kho",        "Kho"),
+        new("NhanVien",   "Nhân viên"),
+        new("CuaHang",  "Cửa hàng"),
+        new("GiaXuat",   "Giá xuất"),
+        new("NgayXuat",  "Ngày xuất")
+    };
+
+    public record FilterOption(string Value, string Label);
+
+    async Task SearchByFilter()
+    {
+        if (string.IsNullOrWhiteSpace(searchTerm) || string.IsNullOrEmpty(selectedFilter))
+        {
+            await ResetVoid();
+            return;
+        }
+
+        var term = searchTerm.Trim();
+
+        switch (selectedFilter)
+        {
+            case "Kho":
+                var khoIds = listKho
+                    .Where(k => k.TenKho.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .Select(k => k.MaKho);
+                query = db.PhieuXuats
+                        .AsNoTracking()
+                        .Where(p => khoIds.Contains(p.MaKho));
+                break;
+
+            case "NhanVien":
+                var nvIds = listNhanVien
+                    .Where(n => n.TenNV.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .Select(n => n.MaNV);
+                query = db.PhieuXuats
+                        .AsNoTracking()
+                        .Where(p => nvIds.Contains(p.MaNV));
+                break;
+
+            case "CuaHang":
+                var nccIds = listCuaHang
+                    .Where(nc => nc.TenCH.Contains(term, StringComparison.OrdinalIgnoreCase))
+                    .Select(nc => nc.MaCH);
+                query = db.PhieuXuats
+                        .AsNoTracking()
+                        .Where(p => nccIds.Contains(p.MaCH));
+                break;
+            case "GiaXuat":
+                if (minPrice.HasValue && maxPrice.HasValue && minPrice > maxPrice)
+                            {
+                                notificationService.Notify(
+                                    NotificationSeverity.Warning,
+                                    "Lỗi giá nhập",
+                                    "Giá từ không được lớn hơn Giá đến",
+                                    duration: 3000);
+                                return;
+                            }
+                if (minPrice.HasValue && maxPrice.HasValue)
+                {
+                    query = db.PhieuXuats
+                            .Where(p => p.GiaXuat >= minPrice.Value
+                                    && p.GiaXuat <= maxPrice.Value);
+                }
+                else if (minPrice.HasValue)
+                {
+                    query = db.PhieuXuats.Where(p => p.GiaXuat >= minPrice.Value);
+                }
+                else if (maxPrice.HasValue)
+                {
+                    query = db.PhieuXuats.Where(p => p.GiaXuat <= maxPrice.Value);
+                }
+                else
+                {
+                    await ResetVoid();
+                    return;
+                }
+                break;
+
+            case "NgayXuat":
+                if (fromDate.HasValue && toDate.HasValue && toDate < fromDate)
+                {
+                    notificationService.Notify(
+                        NotificationSeverity.Warning,
+                        "Lỗi ngày",
+                        "Ngày kết thúc phải không nhỏ hơn ngày bắt đầu",
+                        duration: 3000
+                    );
+                    return;
+                }
+
+                if (fromDate.HasValue && toDate.HasValue)
+                {
+                    query = db.PhieuXuats
+                            .Where(p => p.NgayXuat.Date >= fromDate.Value.Date
+                                    && p.NgayXuat.Date <= toDate.Value.Date);
+                }
+                else if (fromDate.HasValue)
+                {
+                    query = db.PhieuXuats
+                            .Where(p => p.NgayXuat.Date >= fromDate.Value.Date);
+                }
+                else if (toDate.HasValue)
+                {
+                    query = db.PhieuXuats
+                            .Where(p => p.NgayXuat.Date <= toDate.Value.Date);
+                }
+                else
+                {
+                    await ResetVoid();
+                    return;
+                }
+                break;
+
+            default:
+                await ResetVoid();
+                return;
+        }
 
         await GTable.Refresh();
     }

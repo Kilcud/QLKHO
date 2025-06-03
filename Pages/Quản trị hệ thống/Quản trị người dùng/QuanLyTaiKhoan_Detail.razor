@@ -95,14 +95,6 @@
             return false;
         }
 
-        // 3) Không chứa tên nhân viên (TenNV)
-        if (!string.IsNullOrWhiteSpace(currentNV.TenNV) &&
-            pwd.IndexOf(currentNV.TenNV, StringComparison.OrdinalIgnoreCase) >= 0)
-        {
-            error = "Mật khẩu không được chứa tên nhân viên.";
-            return false;
-        }
-
         return true;
     }
 

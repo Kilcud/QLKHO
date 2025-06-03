@@ -19,7 +19,9 @@ else
         }
         else
         {
-            <RadzenButton Text="Xuất PDF" Click="@ExportPdf" Style="margin-bottom:1rem" Icon="picture_as_pdf" />
+            <div style="text-align:right; padding-top: 2rem; padding-right: 6rem;">
+                <RadzenButton Text="Xuất PDF" Click="@ExportPdf" Icon="picture_as_pdf" Style="padding: 0.5rem 1rem;" />
+            </div>
 
             @foreach (var khoGroup in tonKhoGroupedByKho)
             {

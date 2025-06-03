@@ -6713,14 +6713,6 @@
       "PackagePath": "staticwebassets/logo.png"
     },
     {
-      "Id": "/Users/kilcud/Desktop/QLKHO/wwwroot/reports/BaoCaoTonKho_20250529104344.pdf",
-      "PackagePath": "staticwebassets/reports/BaoCaoTonKho_20250529104344.pdf"
-    },
-    {
-      "Id": "/Users/kilcud/Desktop/QLKHO/wwwroot/reports/BaoCaoTonKho_20250529104431.pdf",
-      "PackagePath": "staticwebassets/reports/BaoCaoTonKho_20250529104431.pdf"
-    },
-    {
       "Id": "obj/Debug/net7.0/staticwebassets/msbuild.QLKHO.Microsoft.AspNetCore.StaticWebAssets.props",
       "PackagePath": "build\\Microsoft.AspNetCore.StaticWebAssets.props"
     },
