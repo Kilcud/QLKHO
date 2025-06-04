@@ -20,7 +20,7 @@ else
         else
         {
             <div style="text-align:right; padding-top: 2rem; padding-right: 6rem;">
-                <RadzenButton Text="Xuất PDF" Click="@ExportPdf" Icon="picture_as_pdf" Style="padding: 0.5rem 1rem;" />
+                <RadzenButton Text="Xuất PDF" Click="@ExportPdf" Icon="picture_as_pdf" Style="padding: 0.5rem 1rem; background-color: rgb(216, 27, 96); color: white;" />
             </div>
 
             @foreach (var khoGroup in tonKhoGroupedByKho)
@@ -28,7 +28,7 @@ else
                 <div class="row" style="margin-bottom:20px; margin-top: 10px">
                     <div class="col-md-12">
                         <RadzenLabel
-                            Style="text-align: center;color: rgb(10, 10, 178); font-family: 'Source Sans 3', sans-serif ; font-weight: bold; width: 100%; font-size: 25px "
+                            Style="text-align: center;color: rgb(216, 27, 96); font-family: 'Source Sans 3', sans-serif ; font-weight: bold; width: 100%; font-size: 25px "
                             Text= "@( "Danh sách hàng tồn kho " + khoGroup.Key )">
                         </RadzenLabel>
                     </div>

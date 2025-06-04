@@ -6,7 +6,7 @@
 @using System.Security.Claims
 @inject IDbContextFactory<QLKHOContext> DbFactory
 @using Microsoft.AspNetCore.Components.Routing;
-
+@inject DialogService dialog
 
 @attribute [Authorize]
 <RadzenDialog />
@@ -78,14 +78,11 @@
                     <RadzenProfileMenu Style="background: none">
                         <Template>
                             <RadzenImage Path="logo.png" Style="width: 35px; height: 35px; margin-right: 0.2rem" />
-                            <span style="color: white">@(NhanVien.TenNV ?? "Admin")
+                            <span style="color: black">@(NhanVien.TenNV ?? "Admin")
                             </span>
                         </Template>
                         <ChildContent>
                             <RadzenProfileMenuItem Path="qlkho/logout" Text="Đăng xuất" Icon="logout">
-                            </RadzenProfileMenuItem>
-                            <RadzenProfileMenuItem Path="qlkho/thong-tin-ca-nhan" Text="Thông tin cá nhân"
-                                Icon="account_circle">
                             </RadzenProfileMenuItem>
                         </ChildContent>
                     </RadzenProfileMenu>
@@ -134,91 +131,106 @@
     private async Task LoadPermissionsAsync()
     {
         initialized = false;
-        StateHasChanged();       // hiện “Đang tải quyền…”
+        StateHasChanged();         // Hiện spinner “Đang tải quyền…”
 
-        await using var db = await DbFactory.CreateDbContextAsync();
-
-        // 1. Lấy username
-        var auth = await AuthStateProvider.GetAuthenticationStateAsync();
-        if (!(auth.User?.Identity?.IsAuthenticated ?? false))
+        // 1. Lấy userId từ claim
+        var authState = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user      = authState.User;
+        if (!(user?.Identity?.IsAuthenticated ?? false))
         {
-            initialized = true;       // tắt spinner
+            initialized = true;
             StateHasChanged();
             return;
         }
-        
-        var username = auth.User.Identity?.Name;
 
-        // 2. Tìm user và nhóm
-        if (!string.IsNullOrEmpty(username))
+        // userId luôn có vì bạn thêm lúc Sign-In
+        if (!int.TryParse(user.FindFirstValue(ClaimTypes.NameIdentifier), out idNguoiDung))
         {
-            var user = await db.NguoiDungs.FirstOrDefaultAsync(u => u.Username == username);
-        
-            var nhomIds = await db.Nhom_NguoiDungs
-                               .Where(n => n.IdNguoiDung == user.IdNguoiDung)
-                               .Select(n => n.IdNhom)
-                               .ToListAsync();
+            // Sai định dạng → cho ẩn danh
+            Nav.NavigateTo("/qlkho/login", forceLoad:true);
+            return;
+        }
 
-            // 2.1. Build menu
-            var chucNangIds = await db.Nhom_ChucNangs
-                                    .Where(x => nhomIds.Contains(x.IdNhom))
-                                    .Select(x => x.IdChucNang)
-                                    .Distinct()
-                                    .ToListAsync();
+        await using var db = await DbFactory.CreateDbContextAsync();
 
-            listChucNang = await db.ChucNangs
-                                .Where(x => chucNangIds.Contains(x.IdChucNang))
-                                .OrderBy(x => x.STT)
+        /******** 2. Lấy thông tin nhân viên (nếu cần) ********/
+        int.TryParse(user.FindFirstValue("IdNhanVien"), out idNhanVien);
+        NhanVien = idNhanVien > 0
+            ? await db.NhanViens.FindAsync(idNhanVien) ?? new NhanVien()
+            : new NhanVien();
+
+        /******** 3. Lấy danh sách nhóm của user ********/
+        var nhomIds = await db.Nhom_NguoiDungs
+                            .Where(x => x.IdNguoiDung == idNguoiDung)
+                            .Select(x => x.IdNhom)
+                            .ToListAsync();
+
+        /******** 4. Xây menu & tra quyền trang hiện tại ********/
+        var chucNangIds = await db.Nhom_ChucNangs
+                                .Where(x => nhomIds.Contains(x.IdNhom))
+                                .Select(x => x.IdChucNang)
+                                .Distinct()
                                 .ToListAsync();
 
-            dictFocus = listChucNang.ToDictionary(c => c.IdChucNang, _ => false);
+        listChucNang = await db.ChucNangs
+                            .Where(x => chucNangIds.Contains(x.IdChucNang))
+                            .OrderBy(x => x.STT)
+                            .ToListAsync();
 
-            // --- Phân quyền cho trang con ngay trong layout ---
-            // 3. Tìm IdChucNang dựa vào path
-            var path = new Uri(Nav.Uri).AbsolutePath;   // ví dụ "/qlkho/thong-tin-loai-san-pham"
-            if (path is "/qlkho/login" or "/qlkho/logout" or "/qlkho/404" or "/" or "/qlkho" or "/qlkho/home")
+        dictFocus = listChucNang.ToDictionary(c => c.IdChucNang, _ => false);
+
+        // Tránh xử lý các trang đặc biệt
+        var path = new Uri(Nav.Uri).AbsolutePath;
+        if (path is "/qlkho/login" or "/qlkho/logout" or "/qlkho/404"
+            or "/" or "/qlkho" or "/qlkho/home")
+        {
+            initialized = true;
+            StateHasChanged();
+            return;
+        }
+
+        // Lấy record chức năng theo path
+        var func = await db.ChucNangs.FirstOrDefaultAsync(c => c.DuongDan == path);
+        if (func != null)
+        {
+            var perm = await db.Nhom_ChucNangs
+                            .Where(nc => nc.IdChucNang == func.IdChucNang
+                                        && nhomIds.Contains(nc.IdNhom))
+                            // OR quyền từ nhiều nhóm
+                            .GroupBy(_ => 1)
+                            .Select(g => new
+                            {
+                                AllowView   = g.Any(x => x.AllowView),
+                                AllowAdd    = g.Any(x => x.AllowAdd),
+                                AllowEdit   = g.Any(x => x.AllowEdit),
+                                AllowDelete = g.Any(x => x.AllowDelete)
+                            })
+                            .FirstOrDefaultAsync();
+
+            CanView   = perm?.AllowView   ?? false;
+            CanAdd    = perm?.AllowAdd    ?? false;
+            CanEdit   = perm?.AllowEdit   ?? false;
+            CanDelete = perm?.AllowDelete ?? false;
+
+            perms = new PagePermissions
             {
-                initialized = true;        // bỏ spinner
-                StateHasChanged();
-                return;          
-            }
-            var func = await db.ChucNangs
-                            .FirstOrDefaultAsync(c => c.DuongDan == path);
-
-            if (func != null)
-            {
-                // 4. Lấy quyền OR (nếu user vào nhiều nhóm)
-                var perm = await db.Nhom_ChucNangs
-                                    .Where(nc => nc.IdChucNang == func.IdChucNang
-                                            && nhomIds.Contains(nc.IdNhom))
-                                    .FirstOrDefaultAsync();
-
-                if (perm != null)
-                {
-                    CanView   = perm.AllowView;
-                    CanAdd    = perm.AllowAdd;
-                    CanEdit   = perm.AllowEdit;
-                    CanDelete = perm.AllowDelete;
-                }
-                
-                // Gán vào perms để truyền xuống page con
-                perms.CanView   = CanView;
-                perms.CanAdd    = CanAdd;
-                perms.CanEdit   = CanEdit;
-                perms.CanDelete = CanDelete;
-            }
+                CanView   = CanView,
+                CanAdd    = CanAdd,
+                CanEdit   = CanEdit,
+                CanDelete = CanDelete
+            };
         }
 
         if (!CanView)
         {
-            // user gõ URL lậu → chuyển về 404 riêng
-            Nav.NavigateTo("/qlkho/404", forceLoad: true);
+            Nav.NavigateTo("/qlkho/404", forceLoad:true);
             return;
         }
 
         initialized = true;
         StateHasChanged();
     }
+
     protected override async Task OnInitializedAsync()
     {     
         Nav.LocationChanged += OnLocationChanged;

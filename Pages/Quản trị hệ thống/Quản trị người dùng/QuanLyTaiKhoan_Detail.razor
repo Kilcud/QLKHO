@@ -9,25 +9,26 @@
         <div class="container-fluid">
             <div class="row">
                 <div class="col-md-12">
-                    <RadzenFormField style="width: 100%; margin-top: 1.5rem" Text="Tên tài khoản">
-                        <Start>
-                            <RadzenIcon Icon="account_circle" />
-                        </Start>
+                    <RadzenFormField Text="Tên tài khoản" Style="width:100%;margin-top:1.5rem">
+                        <Start><RadzenIcon Icon="account_circle"/></Start>
                         <ChildContent>
-                            <RadzenTextBox @bind-Value="@NguoiDung.Username" Disabled="false" />
+                            <RadzenTextBox @bind-Value="NguoiDung.Username"
+                                        Disabled="@( !isNew )" />   <!-- khoá khi đã có -->
                         </ChildContent>
                     </RadzenFormField>
                 </div>
 
                 <div class="col-md-12">
-                    <RadzenFormField style="width: 100%; margin-top: 1.5rem" Text="Mật khẩu">
-                        <Start>
-                            <RadzenIcon Icon="lock" />
-                        </Start>
-                        <ChildContent>
-                            <RadzenTextBox @bind-Value="@NguoiDung.Password" Disabled="false" />
-                        </ChildContent>
-                    </RadzenFormField>
+                    @if (isNew)
+                    {
+                        <RadzenFormField Text="Mật khẩu" Style="width:100%;margin-top:1.5rem">
+                            <Start><RadzenIcon Icon="lock"/></Start>
+                            <ChildContent>
+                                <RadzenPassword @bind-Value="NguoiDung.Password"
+                                                PasswordMeter="true" Style="width:100%"/>
+                            </ChildContent>
+                        </RadzenFormField>
+                    }
                 </div>
                 
                 <FormField Size="12" Text="Nhóm người dùng">
@@ -55,6 +56,7 @@
     NhanVien NhanVien = new NhanVien();
     NhanVien currentNV = new NhanVien();
     string txtButton  = "Thêm mới";
+    bool isNew;
     protected override async Task OnInitializedAsync()
     {
         currentNV = record;
@@ -72,6 +74,8 @@
                                    .ToList();
 
             txtButton  = NguoiDung.IdNguoiDung == 0 ? "Thêm mới" : "Cập nhật";
+
+            isNew = NguoiDung.IdNguoiDung == 0;   // true = tạo mới, false = đã tồn tại
         }
     }
 
@@ -105,26 +109,33 @@
             // 0. Validate mật khẩu
             if (!ValidatePassword(NguoiDung.Password, out var errorMessage))
             {
-                notificationService.Notify(
-                    NotificationSeverity.Error,
-                    "Mật khẩu không hợp lệ",
-                    errorMessage,
-                    4000
-                );
-                return;
+                
             }
 
             /******** 1. Thêm / Cập nhật bảng NguoiDung ********/
             bool isNew = NguoiDung.IdNguoiDung == 0;
-            NguoiDung.Password = HashingServices.HashPassword(NguoiDung.Password);
 
             if (isNew)
             {
+                if (!ValidatePassword(NguoiDung.Password, out var err))
+                {
+                    notificationService.Notify(
+                    NotificationSeverity.Error,
+                    "Mật khẩu không hợp lệ",
+                    errorMessage, 4000
+                    );
+                return;
+                }
+
+                NguoiDung.Password = HashingServices.HashPassword(NguoiDung.Password);
                 db.NguoiDungs.Add(NguoiDung);
             }
             else
             {
+                // KHÔNG động tới Password hay Username nữa
                 db.NguoiDungs.Update(NguoiDung);
+                db.Entry(NguoiDung).Property(x => x.Password).IsModified = false;
+                db.Entry(NguoiDung).Property(x => x.Username).IsModified = false;
             }
 
             await db.SaveChangesAsync();            // => IdNguoiDung mới đã có

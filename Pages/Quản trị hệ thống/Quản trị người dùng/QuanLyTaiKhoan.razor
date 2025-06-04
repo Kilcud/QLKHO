@@ -63,12 +63,12 @@
             <RadzenDataGridColumn TItem="NhanVien" Title="Họ tên"
                                   Property="TenNV" Width="200px" />
                                   
-            <RadzenDataGridColumn TItem="NhanVien" Title="Mật khẩu"
+            @* <RadzenDataGridColumn TItem="NhanVien" Title="Mật khẩu"
                                   Width="200px" Sortable="false">
                 <Template Context="nv">
                     @(listNguoiDung.FirstOrDefault(nd => nd.MaNV == nv.MaNV)?.Password ?? "" )
                 </Template>
-            </RadzenDataGridColumn>
+            </RadzenDataGridColumn> *@
             <!-- Thao tác chi tiết -->
         </MoreColumns>
 
@@ -161,6 +161,23 @@
     /*------------- DELETE (nếu cần) -------------*/
     protected async Task Delete(NhanVien nv)
     {
-        // tuỳ yêu cầu – xóa nhân viên hay chỉ ràng buộc?
+        var user = await db.NguoiDungs
+                       .Include(u => u.Nhom_NguoiDungs)
+                       .FirstOrDefaultAsync(u => u.MaNV == nv.MaNV);
+
+        if (user is null) return;
+
+        // xoá liên kết nhóm trước
+        db.Nhom_NguoiDungs.RemoveRange(user.Nhom_NguoiDungs);
+
+        // xoá bản ghi người dùng
+        db.NguoiDungs.Remove(user);
+
+        await db.SaveChangesAsync();
+
+        notificationService.Notify(NotificationSeverity.Success,
+            "Đã thu hồi", "Tài khoản xoá sạch – muốn cấp lại thì tạo mới", 3000);
+
+        await GTable.Refresh();
     }
 }

@@ -132,8 +132,6 @@ public partial class QLKHOContext : DbContext
         {
             entity.Property(e => e.SDTKho).IsFixedLength();
             entity.Property(e => e.TenKho_Norm).HasComputedColumnSql("(lower(Trim([TenKho])))", true);
-
-            entity.HasOne(d => d.TrgKhoNavigation).WithMany(p => p.Khos).HasConstraintName("FK_Kho_TrgKho");
         });
 
         modelBuilder.Entity<LoaiSanPham>(entity =>

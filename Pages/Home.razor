@@ -12,25 +12,6 @@
         <p>Xin chào, @auth.User.Identity?.Name!</p>
     </Authorized>
 </AuthorizeView>
-        @* <h3>Trang chủ</h3>
-        <p>Xin chào, @auth.User.Identity?.Name!</p>
-        @* <div class="sidebar">
-            <div class="logo-details">
-                <i><img src="logo.png" style="width: 35px" /></i>
-                <span class="logo_name">Lý lịch khoa học C500</span>
-            </div>
-            <ul class="nav-links">
-                <!-- Hiển thị các chức năng từ DB (nếu có) -->
-                @foreach (var item in listChucNang)
-                {
-                    <li @onclick="() => navigateMenu(item.DuongDan)">
-                        <a href="@item.DuongDan">@item.TenChucNang</a>
-                    </li>
-                }
-            </ul>
-        </div>
-    </Authorized>
-</AuthorizeView> *@
 
 @code {
     [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;

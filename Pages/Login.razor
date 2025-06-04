@@ -27,9 +27,9 @@
                                 <img src="logo.png"
                                     style="height:90px;width:auto; margin: 20 20 20 0; padding-right: 30px;" />
                                 <div class="text-center">
-                                     <strong style="font-size: 1.7rem; color: #112572">HỆ THỐNG QUẢN LÝ HÀNG TỒN KHO</strong>
+                                     <strong style="font-size: 1.7rem; color: #D81B60">HỆ THỐNG QUẢN LÝ HÀNG TỒN KHO</strong>
                                     <br />
-                                   <span style="font-size: 1rem">Môn học: ATCSDL</span>
+                                   <span style="font-size: 1rem; color: #AD1457">Môn học: ATCSDL</span>
 
 
                                 </div>
@@ -39,7 +39,7 @@
                                     <ChildContent Context="ctx">
                                     <RadzenFormField style="width: 100%; margin-top: 1.5rem" Text="Tên tài khoản">
                                         <Start>
-                                            <RadzenIcon Icon="account_circle" />
+                                            <RadzenIcon Icon="account_circle" style="color: #d81b60a6" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenTextBox @bind-Value="loginModel.Username" />
@@ -47,7 +47,7 @@
                                     </RadzenFormField>
                                     <RadzenFormField style="width: 100%; margin-top:1.5rem" Text="Mật khẩu">
                                         <Start>
-                                            <RadzenIcon Icon="lock" />
+                                            <RadzenIcon Icon="lock" style="color: #d81b60a6" />
                                         </Start>
                                         <ChildContent>
                                             <RadzenTextBox @bind-Value="loginModel.Password" Visible="@(!viewPassword)" />
@@ -55,7 +55,7 @@
                                         </ChildContent>
                                         <End>
                                             <RadzenButton Icon="@(viewPassword ? "visibility" : "visibility_off")"
-                                                Click="TogglePassword" Variant="Variant.Text" Size="ButtonSize.Small" />
+                                                Click="TogglePassword" Variant="Variant.Text" Size="ButtonSize.Small" style="color: #d81b60a6"/>
                                         </End>
                                     </RadzenFormField>
                                     <div style="margin-top: 1.5rem">
@@ -63,7 +63,7 @@
                                         <RadzenLabel Text="Ghi nhớ đăng nhập" Component="save_login"
                                             Style="margin-left: 8px; vertical-align: middle;" />
                                     </div>
-                                    <RadzenButton style="margin-top: 1.5rem; width: 100%; background-color:#112572 "
+                                    <RadzenButton style="margin-top: 1.5rem; width: 100%; background-color:#d81b60a6"
                                         class="rz-info-darker" Text="Đăng nhập" ButtonType="ButtonType.Submit">
                                     </RadzenButton>
                                     </ChildContent>

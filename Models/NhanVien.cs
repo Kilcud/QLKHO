@@ -22,12 +22,11 @@ public partial class NhanVien
     [StringLength(40)]
     public string DiaChiNV { get; set; } = null!;
 
-    [StringLength(10)]
+    [Required]
+    [RegularExpression(@"^\d{10}$", ErrorMessage = "SĐT phải đúng 10 chữ số.")]
+    [StringLength(10, MinimumLength = 10, ErrorMessage = "SĐT phải đủ 10 chữ số.")]
     [Unicode(false)]
     public string SDTNV { get; set; } = null!;
-
-    [InverseProperty("TrgKhoNavigation")]
-    public virtual ICollection<Kho> Khos { get; set; } = new List<Kho>();
 
     [ForeignKey("MaKho")]
     [InverseProperty("NhanViens")]

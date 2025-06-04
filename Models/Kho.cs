@@ -19,8 +19,6 @@ public partial class Kho
     [StringLength(10)]
     public string? TenKho_Norm { get; set; }
 
-    public int? TrgKho { get; set; }
-
     [StringLength(10)]
     [Unicode(false)]
     public string SDTKho { get; set; } = null!;
@@ -39,8 +37,4 @@ public partial class Kho
 
     [InverseProperty("MaKhoNavigation")]
     public virtual ICollection<SanPham> SanPhams { get; set; } = new List<SanPham>();
-
-    [ForeignKey("TrgKho")]
-    [InverseProperty("Khos")]
-    public virtual NhanVien? TrgKhoNavigation { get; set; }
 }

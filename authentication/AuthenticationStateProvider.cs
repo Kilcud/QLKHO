@@ -21,16 +21,19 @@ namespace QLKHO.Authentication
             var identity  = new ClaimsIdentity(claims, "CustomAuth");
             var principal = new ClaimsPrincipal(identity);
 
-            string userId = claims.First(c => c.Type == ClaimTypes.Name).Value;
+            string userId     = claims.First(c => c.Type == ClaimTypes.NameIdentifier).Value;      
+            string idNhanVien = claims.FirstOrDefault(c => c.Type == "IdNhanVien")?.Value ?? "0";
 
             if (rememberMe)
             {
                 await _localStorage.SetAsync ("userId",     userId);
+                await _localStorage.SetAsync("IdNhanVien",   idNhanVien);
                 await _localStorage.SetAsync ("dateExpire", DateTime.Now.AddDays(7));
             }
             else
             {
                 await _sessionStorage.SetAsync("userId",     userId);
+                await _localStorage.SetAsync("IdNhanVien",   idNhanVien);
                 await _sessionStorage.SetAsync("dateExpire", DateTime.Now.AddHours(3));
             }
 
@@ -42,30 +45,58 @@ namespace QLKHO.Authentication
         {
             try
             {
+                // --- LẤY userId ---
                 var userIdSessionStorageResult = await _sessionStorage.GetAsync<string>("userId");
                 var userIdLocalStorageResult = await _localStorage.GetAsync<string>("userId");
                 string? userIdSession = userIdSessionStorageResult.Success ? userIdSessionStorageResult.Value : null;
                 string? userIdLocal = userIdLocalStorageResult.Success ? userIdLocalStorageResult.Value : null;
                 string? userId = userIdSession == null ? userIdLocal : userIdSession;
 
+                // --- LẤY IdNhanVien ---
+                var nvSessionResult   = await _sessionStorage.GetAsync<string>("IdNhanVien");
+                var nvLocalResult     = await _localStorage.GetAsync<string>("IdNhanVien");
+                string? nvSession     = nvSessionResult.Success ? nvSessionResult.Value : null;
+                string? nvLocal       = nvLocalResult.Success   ? nvLocalResult.Value   : null;
+                string? idNhanVienStr = nvSession ?? nvLocal;
+                int     maNV          = 0;
+                if (!string.IsNullOrWhiteSpace(idNhanVienStr))
+                    int.TryParse(idNhanVienStr, out maNV);
+
+                // --- LẤY dateExpire ---
                 var dateExpireSessionStorageResult = await _sessionStorage.GetAsync<DateTime>("dateExpire");
                 var dateExpireLocalStorageResult = await _localStorage.GetAsync<DateTime>("dateExpire");
                 DateTime? dateExpireSession = dateExpireSessionStorageResult.Success ? dateExpireSessionStorageResult.Value : null;
                 DateTime? dateExpireLocal = dateExpireLocalStorageResult.Success ? dateExpireLocalStorageResult.Value : null;
                 DateTime? dateExpire = dateExpireSession == null ? dateExpireLocal : dateExpireSession;
 
+                // Nếu không có userId hoặc dateExpire => ẩn danh
                 if (userId == null || dateExpire == null)
                     return await Task.FromResult(new AuthenticationState(_anonymous));
+
+                // Nếu token đã hết hạn
                 if (dateExpire.Value < DateTime.Now)
                 {
                     return await Task.FromResult(new AuthenticationState(_anonymous));
                 }
-                var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new List<Claim>
-                {
-                    new Claim(ClaimTypes.Name, userId ?? ""),
 
-                }, "CustomAuth"));
-                return await Task.FromResult(new AuthenticationState(claimsPrincipal));
+                // --- TẠO CLAIMS từ hai giá trị đã lưu ---
+                var claims = new List<Claim>
+                {
+                    new Claim(ClaimTypes.NameIdentifier, userId),
+                    new Claim("IdNhanVien", maNV.ToString())
+                };
+
+                // Cuối cùng tạo Identity + Principal
+                var identity       = new ClaimsIdentity(claims, "CustomAuth");
+                var principal      = new ClaimsPrincipal(identity);
+                return new AuthenticationState(principal);
+
+                // var claimsPrincipal = new ClaimsPrincipal(new ClaimsIdentity(new List<Claim>
+                // {
+                //     new Claim(ClaimTypes.Name, userId ?? ""),
+
+                // }, "CustomAuth"));
+                // return await Task.FromResult(new AuthenticationState(claimsPrincipal));
             }
             catch
             {

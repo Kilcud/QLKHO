@@ -21,5 +21,14 @@ namespace QLKHO.Services
                 return builder.ToString();
             }
         }
+
+        public static bool VerifyPassword(string plainText, string hashedFromDb)
+        {
+            if (string.IsNullOrWhiteSpace(hashedFromDb)) return false;
+
+            string hashOfInput = HashPassword(plainText);
+            // So sánh không phân biệt hoa-thường, dùng time-constant compare nếu cần
+            return string.Equals(hashOfInput, hashedFromDb, StringComparison.OrdinalIgnoreCase);
+        }
     }
 }

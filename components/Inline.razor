@@ -11,14 +11,14 @@
 <div class="row" style="margin-bottom:30px; margin-top: 10px">
     <div class="col-md-12">
         <RadzenLabel
-            Style="text-align: center;color: rgb(10, 10, 178); font-family: 'Source Sans 3', sans-serif ; font-weight: bold; width: 100%; font-size: 25px "
+            Style="text-align: center;color: rgb(216, 27, 96); font-family: 'Source Sans 3', sans-serif ; font-weight: bold; width: 100%; font-size: 25px "
             Text="@("DANH SÁCH " + TableTitle.ToUpper())">
         </RadzenLabel>
     </div>
 </div>
 <div style="justify-content:space-between;margin-bottom:5px; margin-right: 1rem">
     <div class="col-12 col-md-4" style="padding: 0px">
-        <RadzenButton Click=@(args => AddRow()) Text="@AddBtnCaption" Disabled="@(DisableAdd || disableAddInternal)" />
+        <RadzenButton Style = "background-color: rgb(216, 27, 96); color: white;" Click=@(args => AddRow()) Text="@AddBtnCaption" Disabled="@(DisableAdd || disableAddInternal)" />
         @if (MoreButtons != null)
         {
             @MoreButtons

@@ -61,11 +61,11 @@
                             }
                     
                             <div class="col-1">
-                                <RadzenButton Icon="search" Style="width:100%" Click="@SearchByFilter" />
+                                <RadzenButton Icon="search" Style="width:100%; background-color: rgb(216, 27, 96); color: white;" Click="@SearchByFilter" />
                             </div>
 
                             <div class="col-1">
-                                <RadzenButton Icon="close" Style="width:100%" Click="@ResetVoid" />
+                                <RadzenButton Icon="close" Style="width:100%; background-color: rgb(216, 27, 96); color: white;" Click="@ResetVoid" />
                             </div>
                         </div>
                     </div>
@@ -111,7 +111,7 @@
             </MoreColumns>
             
             <FormDialog Context="ctx">
-                <ThongTinPhieuXuat_Detail title=@title record="ctx" />
+                <ThongTinPhieuXuat_Detail title=@title record="ctx" CurrentMaNV="currentMaNV" />
             </FormDialog>
         </Table>
     </Authorized>
@@ -128,13 +128,46 @@
 
     Table<PhieuXuat> GTable = default!;
     string title = "phiếu xuất";
-    
-    protected override void OnInitialized()
+
+    string selectedFilter = "Kho";
+    string searchTerm = "";
+    decimal? minPrice;
+    decimal? maxPrice;
+    DateTime? fromDate;
+    DateTime? toDate;
+
+    private int currentMaNV;
+
+    List<FilterOption> filterOptions = new()
     {
-        query = db.PhieuXuats.AsNoTracking().AsQueryable() ?? Enumerable.Empty<PhieuXuat>().AsQueryable();
+        new("CuaHang",  "Cửa hàng"),
+        new("GiaXuat",   "Giá xuất"),
+        new("NgayXuat",  "Ngày xuất")
+    };
+
+    public record FilterOption(string Value, string Label);
+    
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authenticationState;
+        var user      = authState.User;
+        int.TryParse(user.FindFirst("IdNhanVien")?.Value, out currentMaNV);
+
         listKho = db.Khos.ToList();
         listNhanVien = db.NhanViens.ToList();
         listCuaHang = db.CuaHangs.ToList();
+
+        var baseQuery = db.PhieuXuats.AsNoTracking();
+        query = (currentMaNV > 0
+                 ? baseQuery.Where(p => p.MaNV == currentMaNV)
+                 : baseQuery)
+                .AsQueryable();
+
+        if (currentMaNV == 0)
+        {
+            filterOptions.Insert(1, new("NhanVien", "Nhân viên"));
+            filterOptions.Insert(2, new("Kho",        "Kho")); 
+        }
     }
 
     protected async Task Delete(PhieuXuat record)
@@ -165,25 +198,6 @@
 
         await GTable.Refresh();
     }
-
-    string selectedFilter = "Kho";
-    string searchTerm = "";
-    decimal? minPrice;
-    decimal? maxPrice;
-    DateTime? fromDate;
-    DateTime? toDate;
-
-
-    List<FilterOption> filterOptions = new()
-    {
-        new("Kho",        "Kho"),
-        new("NhanVien",   "Nhân viên"),
-        new("CuaHang",  "Cửa hàng"),
-        new("GiaXuat",   "Giá xuất"),
-        new("NgayXuat",  "Ngày xuất")
-    };
-
-    public record FilterOption(string Value, string Label);
 
     async Task SearchByFilter()
     {

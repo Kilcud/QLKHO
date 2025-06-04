@@ -29,7 +29,7 @@
 }
 .sidebar .logo-details .logo_name {
   font-size: 22px;
-  color: #f9f5f6;
+  color: black;
   font-weight: 600;
   transition: 0.3s ease;
   transition-delay: 0.1s;
@@ -70,7 +70,7 @@
   min-width: 50px;
   text-align: center;
   line-height: 50px;
-  color: #f9f5f6;
+  color: black;
   font-size: 17px;
   cursor: pointer;
   transition: all 0.3s ease;
@@ -89,7 +89,7 @@
 .sidebar .nav-links li a .link_name {
   font-size: 18px;
   font-weight: 400;
-  color: #f9f5f6;
+  color: black;
   transition: all 0.4s ease;
 }
 .sidebar.close .nav-links li a .link_name {
@@ -98,14 +98,15 @@
 }
 .sidebar .nav-links li .sub-menu {
   padding: 5px 3px 3px 5px;
-  background: #152b6a;
+  background: #d09bbc81;
   display: none;
+
 }
 .sidebar .nav-links li.showMenu .sub-menu {
   display: block;
 }
 .sidebar .nav-links li .sub-menu a {
-  color: #f9f5f6;
+  color: black;
   font-size: 17px;
   padding: 4px 0;
   white-space: nowrap;

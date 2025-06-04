@@ -1,0 +1,126 @@
+@page "/qlkho/profile"
+@attribute [Authorize]
+
+@using QLKHO.Models
+@using Microsoft.EntityFrameworkCore
+@using Radzen
+@inject QLKHOContext                db
+@inject NotificationService         notificationService
+@inject AuthenticationStateProvider authStateProvider
+@inject NavigationManager           navigation
+
+<PageTitle>Thông tin cá nhân</PageTitle>
+
+<div class="container py-4">
+    <RadzenCard Style="max-width:600px;margin:auto">
+        <HeaderTemplate>
+            <h4 class="m-0 text-primary">
+                <RadzenIcon Icon="account_circle" Style="vertical-align:sub;margin-right:4px" />
+                Hồ sơ nhân viên
+            </h4>
+        </HeaderTemplate>
+
+        @if (nv == null)
+        {
+            <RadzenProgressBar Mode="ProgressBarMode.Indeterminate" />
+        }
+        else
+        {
+            <RadzenTemplateForm TItem="NhanVien"
+                                Data="@nv"
+                                Submit="@Save"
+                                Style="width:100%">
+
+                <RadzenFieldset Text="Thông tin cơ bản" Style="margin-bottom:1rem">
+                    <ChildContent>
+
+                        @* ---- Mã NV hiển thị read-only, KHÔNG bind ---- *@
+                        @* <RadzenLabel Text="Mã NV" />
+                        <RadzenTextBox Value="@nv.MaNV.ToString()"
+                                       Disabled="true" Style="width:100%" /> *@
+
+                        <RadzenLabel Text="Họ tên" Style="margin-top:0.5rem" />
+                        <RadzenTextBox @bind-Value="nv.TenNV" Style="width:100%" />
+
+                        <RadzenLabel Text="Giới tính" Style="margin-top:0.5rem" />
+                        <RadzenDropDown @bind-Value="nv.GioiTinh"
+                                        Data="@genders"
+                                        TextProperty="Text"
+                                        ValueProperty="Value"
+                                        Style="width:100%" />
+
+                        <RadzenLabel Text="Địa chỉ" Style="margin-top:0.5rem" />
+                        <RadzenTextBox @bind-Value="nv.DiaChiNV" Style="width:100%" />
+
+                        <RadzenLabel Text="SĐT" Style="margin-top:0.5rem" />
+                        <RadzenTextBox @bind-Value="nv.SDTNV"
+                                    Name="sdt"
+                                    Style="width:100%" />
+
+                        <RadzenRegularExpressionValidator Component="sdt"
+                                                        Pattern="^\d{10}$"
+                                                        Text="SĐT phải đủ 10 chữ số!" />
+
+                        <RadzenRequiredValidator Component="sdt"
+                                                Text="SĐT không được để trống!" />
+
+                        <RadzenLabel Text="Kho quản lý" Style="margin-top:0.5rem" />
+                        <RadzenTextBox Value="@(nv.MaKhoNavigation?.TenKho ?? "")"
+                                       Disabled="true" Style="width:100%" />
+                    </ChildContent>
+                </RadzenFieldset>
+
+                <RadzenButton Icon="save"      Text="Lưu"      ButtonType="ButtonType.Submit" Style="margin-right:6px" />
+                <RadzenButton Icon="arrow_back" Text="Quay lại" ButtonStyle="ButtonStyle.Secondary" Click="@GoHome" />
+            </RadzenTemplateForm>
+        }
+    </RadzenCard>
+</div>
+
+@code {
+    NhanVien? nv;
+
+    // Data cho dropdown giới tính
+    readonly IEnumerable<object> genders = new[]
+    {
+        new { Value = true , Text = "Nam" },
+        new { Value = false, Text = "Nữ" }
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        var authState = await authStateProvider.GetAuthenticationStateAsync();
+        var nvClaim   = authState.User.FindFirst("IdNhanVien")?.Value;
+
+        if (!int.TryParse(nvClaim, out int idNv) || idNv == 0)
+        {
+            notificationService.Notify(NotificationSeverity.Warning, "Lỗi", "Không tìm thấy nhân viên!");
+            return;
+        }
+
+        nv = await db.NhanViens
+                     .Include(x => x.MaKhoNavigation)
+                     .FirstOrDefaultAsync(x => x.MaNV == idNv);
+
+        StateHasChanged();
+    }
+
+    async Task Save()
+    {
+        if (nv == null) return;
+
+        if (string.IsNullOrWhiteSpace(nv.SDTNV) || nv.SDTNV.Length != 10 || !nv.SDTNV.All(char.IsDigit))
+        {
+            notificationService.Notify(NotificationSeverity.Error,
+                "Lỗi", "SĐT phải đúng 10 chữ số!");
+            return;
+        }
+
+        db.NhanViens.Update(nv);
+        await db.SaveChangesAsync();
+
+        notificationService.Notify(NotificationSeverity.Success, "Thành công", "Đã cập nhật hồ sơ!");
+    }
+
+    void GoHome() => navigation.NavigateTo("/qlkho/home");
+}

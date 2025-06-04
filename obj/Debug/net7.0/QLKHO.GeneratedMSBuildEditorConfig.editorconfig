@@ -62,6 +62,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = UGFnZXMvNDA0LnJhem9y
 build_metadata.AdditionalFiles.CssScope = 
 
+[/Users/kilcud/Desktop/QLKHO/Pages/ChangePassword.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvQ2hhbmdlUGFzc3dvcmQucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
 [/Users/kilcud/Desktop/QLKHO/Pages/Home.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXMvSG9tZS5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -112,6 +116,10 @@ build_metadata.AdditionalFiles.CssScope =
 
 [/Users/kilcud/Desktop/QLKHO/Pages/RedirectToLogin.razor]
 build_metadata.AdditionalFiles.TargetPath = UGFnZXMvUmVkaXJlY3RUb0xvZ2luLnJhem9y
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/kilcud/Desktop/QLKHO/Pages/ThongTinCaNhan.razor]
+build_metadata.AdditionalFiles.TargetPath = UGFnZXMvVGhvbmdUaW5DYU5oYW4ucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
 [/Users/kilcud/Desktop/QLKHO/Pages/Thông tin sản phẩm/ThongTinSanPham.razor]

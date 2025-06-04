@@ -13,11 +13,11 @@
                 </FormField> *@
 
                 <FormField Size="4" Text="Kho">
-                    <RadzenDropDown Disabled="false" @bind-Value=@PhieuNhap.MaKho Data=@listKho ValueProperty="MaKho" TextProperty="TenKho" />
+                    <RadzenDropDown Disabled="true" @bind-Value=@PhieuNhap.MaKho Data=@listKho ValueProperty="MaKho" TextProperty="TenKho" />
                 </FormField>
 
                 <FormField Size="4" Text="Nhân viên">
-                    <RadzenDropDown Disabled="false" @bind-Value=@PhieuNhap.MaNV Data=@listNhanVien ValueProperty="MaNV" TextProperty="TenNV" />
+                    <RadzenDropDown Disabled="true" @bind-Value=@PhieuNhap.MaNV Data=@listNhanVien ValueProperty="MaNV" TextProperty="TenNV" />
                 </FormField>
 
                 <FormField Size="4" Text="Nhà cung cấp">
@@ -85,6 +85,7 @@ else
 @code {
     [Parameter] public string title { get; set; } = "";
     [Parameter] public PhieuNhap record { get; set; } = default!;
+    [Parameter] public int CurrentMaNV { get; set; }
 
     PhieuNhap PhieuNhap = new PhieuNhap();
     List<Kho> listKho = new List<Kho>();
@@ -101,7 +102,7 @@ else
     Inline_NoLoad<ChiTietPhieuNhap> inline = default!;
     bool Loading = true;
     int count;
-
+    
     protected override async Task OnInitializedAsync()
     {
         listKho = await db.Khos.ToListAsync();
@@ -130,7 +131,17 @@ else
 
             List<int> listMaDVT = listChiTietPhieuNhap.Select(item => item.MaDVT).ToList();
             listDonViTinh = await db.DonViTinhs.Where(item => listMaDVT.Contains(item.MaDVT)).ToListAsync();
-
+        }
+        else 
+        {
+            // Chế độ thêm mới: khởi tạo mặc định chọn phần tử đầu
+            PhieuNhap = new PhieuNhap
+            {
+                MaKho    = listNhanVien.FirstOrDefault(n => n.MaNV == CurrentMaNV)?.MaKho ?? 0,
+                MaNV = listNhanVien.FirstOrDefault(item => item.MaNV == CurrentMaNV)?.MaNV ?? 0,
+                MaNCC     = listNhaCungCap.FirstOrDefault()?.MaNCC  ?? 0,
+                NgayNhap = DateTime.Now
+            };
         }
         Loading = false;
     }
