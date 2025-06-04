@@ -1,6 +1,6 @@
 {
   "Version": 1,
-  "Hash": "WuiPnwo1NqfCZu3/xMvKeW+9prCKC+QlCnaipe/UUBQ=",
+  "Hash": "MtXUaxRRsvsFfvf7bkgGA7K0bVBzkAdOoMjPa8RoypY=",
   "Source": "QLKHO",
   "BasePath": "_content/QLKHO",
   "Mode": "Default",
@@ -32524,44 +32524,6 @@
       "CopyToOutputDirectory": "Never",
       "CopyToPublishDirectory": "PreserveNewest",
       "OriginalItemSpec": "wwwroot/logo.png"
-    },
-    {
-      "Identity": "/Users/kilcud/Desktop/QLKHO/wwwroot/reports/BaoCaoTonKho_20250603135148.pdf",
-      "SourceId": "QLKHO",
-      "SourceType": "Discovered",
-      "ContentRoot": "/Users/kilcud/Desktop/QLKHO/wwwroot/",
-      "BasePath": "_content/QLKHO",
-      "RelativePath": "reports/BaoCaoTonKho_20250603135148.pdf",
-      "AssetKind": "All",
-      "AssetMode": "All",
-      "AssetRole": "Primary",
-      "AssetMergeBehavior": "PreferTarget",
-      "AssetMergeSource": "",
-      "RelatedAsset": "",
-      "AssetTraitName": "",
-      "AssetTraitValue": "",
-      "CopyToOutputDirectory": "Never",
-      "CopyToPublishDirectory": "PreserveNewest",
-      "OriginalItemSpec": "wwwroot/reports/BaoCaoTonKho_20250603135148.pdf"
-    },
-    {
-      "Identity": "/Users/kilcud/Desktop/QLKHO/wwwroot/reports/BaoCaoTonKho_20250603141741.pdf",
-      "SourceId": "QLKHO",
-      "SourceType": "Discovered",
-      "ContentRoot": "/Users/kilcud/Desktop/QLKHO/wwwroot/",
-      "BasePath": "_content/QLKHO",
-      "RelativePath": "reports/BaoCaoTonKho_20250603141741.pdf",
-      "AssetKind": "All",
-      "AssetMode": "All",
-      "AssetRole": "Primary",
-      "AssetMergeBehavior": "PreferTarget",
-      "AssetMergeSource": "",
-      "RelatedAsset": "",
-      "AssetTraitName": "",
-      "AssetTraitValue": "",
-      "CopyToOutputDirectory": "Never",
-      "CopyToPublishDirectory": "PreserveNewest",
-      "OriginalItemSpec": "wwwroot/reports/BaoCaoTonKho_20250603141741.pdf"
     }
   ]
 }

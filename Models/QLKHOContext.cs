@@ -6,14 +6,14 @@ namespace QLKHO.Models;
 
 public partial class QLKHOContext : DbContext
 {
-    public QLKHOContext()
-    {
-    }
+    // public QLKHOContext()
+    // {
+    // }
 
-    public QLKHOContext(DbContextOptions<QLKHOContext> options)
-        : base(options)
-    {
-    }
+    // private QLKHOContext(DbContextOptions<QLKHOContext> options)
+    //     : base(options)
+    // {
+    // }
 
     public virtual DbSet<ChiTietPhieuNhap> ChiTietPhieuNhaps { get; set; }
 
@@ -48,6 +48,8 @@ public partial class QLKHOContext : DbContext
     public virtual DbSet<PhieuXuat> PhieuXuats { get; set; }
 
     public virtual DbSet<SanPham> SanPhams { get; set; }
+
+    public DbSet<AuditLog> AuditLogs => Set<AuditLog>();
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {

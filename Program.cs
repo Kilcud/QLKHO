@@ -20,6 +20,7 @@ builder.Services.AddAuthenticationCore();
 builder.Services.AddScoped<ProtectedSessionStorage>();
 builder.Services.AddScoped<ProtectedLocalStorage>();
 builder.Services.AddScoped<AuthenticationStateProvider, CustomAuthenticationStateProvider>();
+builder.Services.AddHttpContextAccessor();
 
 builder.Services.AddScoped<CustomAuthenticationStateProvider>();
 

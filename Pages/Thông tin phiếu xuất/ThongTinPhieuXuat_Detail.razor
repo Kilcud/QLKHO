@@ -9,7 +9,7 @@
         <MoreForms>
             <div class="row">
                 <FormField Size="4" Text="Kho">
-                    <RadzenDropDown Disabled="true" @bind-Value=@PhieuXuat.MaKho Data=@listKho ValueProperty="MaKho" TextProperty="TenKho" Change="@(async args => await OnKhoChanged((int)args))" />
+                    <RadzenDropDown Disabled="true" @bind-Value=@PhieuXuat.MaKho Data=@listKho ValueProperty="MaKho" TextProperty="TenKho"/>
                 </FormField>
 
                 <FormField Size="4" Text="Nhân viên">
@@ -488,41 +488,6 @@ else
             });
 
         return tongNhap - tongXuat;
-    }
-
-    async Task OnKhoChanged(int newMaKho)
-    {
-        if (record.MaPX != 0 && newMaKho != originalMaKho && listChiTietPhieuXuat.Any())
-        {
-            // Hỏi người dùng có chắc chắn không
-            bool ok = await dialog.Confirm(
-            "Đổi kho sẽ xóa tất cả sản phẩm trong phiếu cũ, bạn có chắc?",
-            "Xác nhận đổi kho",
-            new ConfirmOptions { OkButtonText = "Đồng ý", CancelButtonText = "Hủy", Width = "400px" }
-            ) ?? false;
-
-            if (!ok)
-            {
-                // nếu hủy, trả dropdown về kho cũ
-                PhieuXuat.MaKho = originalMaKho;
-                StateHasChanged();
-                return;
-            }
-
-            // nếu đồng ý, xoá chi tiết để thêm mới
-            listChiTietPhieuXuat.Clear();
-            // đồng thời, bạn có thể reset inline table nếu cần
-        }
-
-        PhieuXuat.MaKho = newMaKho;
-
-        // mỗi lần đổi kho → lọc lại sản phẩm + đơn vị tính
-        await FilterProductsByKho(newMaKho);
-
-        // Nếu đang edit một row, reload để template rebuild dropdown
-        await inline.ReloadTable();
-
-        StateHasChanged();
     }
 
     async Task FilterProductsByKho(int kho)

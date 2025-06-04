@@ -3,6 +3,8 @@
 @inject QLKHOContext db
 @inject DialogService dialog
 @inject NotificationService notificationService
+@using System.Security.Claims
+
 @attribute [Authorize]
 
 @inherits QLKHO.components.AuthorizedPageBase
@@ -152,6 +154,15 @@
         var authState = await authenticationState;
         var user      = authState.User;
         int.TryParse(user.FindFirst("IdNhanVien")?.Value, out currentMaNV);
+
+        int.TryParse(user.FindFirst(ClaimTypes.NameIdentifier)?.Value, out var idNguoiDung);
+
+        /* ---- Xem user có thuộc nhóm 4 (nhóm Kế toán)? ---- */
+        bool isGroup4 = await db.Nhom_NguoiDungs
+                                .AnyAsync(x => x.IdNguoiDung == idNguoiDung && x.IdNhom == 4);
+
+        if (isGroup4)
+            currentMaNV = 0;  
 
         listKho = db.Khos.ToList();
         listNhanVien = db.NhanViens.ToList();
