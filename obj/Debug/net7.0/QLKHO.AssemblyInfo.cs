@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("QLKHO")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+e6a725c210b3846bdb1da4ab4dbca29b70ddb03f")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+892a74bb4da2154a2286e6446aa0768a037f80c0")]
 [assembly: System.Reflection.AssemblyProductAttribute("QLKHO")]
 [assembly: System.Reflection.AssemblyTitleAttribute("QLKHO")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

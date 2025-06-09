@@ -1,35 +1,42 @@
 @page "/qlkho/home"
-
 @attribute [Authorize]
-@inject QLKHOContext db
-@inject NavigationManager UriHelper
-@inject AuthenticationStateProvider authStateProvider
-@inject NotificationService notificationService
+
+@inject QLKHOContext                db
+@inject NavigationManager           Nav
+@inject AuthenticationStateProvider AuthStateProvider
+@inject NotificationService         Noti
 
 <AuthorizeView>
-    <Authorized Context="auth">
+    <Authorized>
         <h3>Trang chủ</h3>
-        <p>Xin chào, @auth.User.Identity?.Name!</p>
+        <p>Xin chào, @TenUser!</p>   @* hiện tên nhân viên *@
     </Authorized>
 </AuthorizeView>
 
+
 @code {
-    [CascadingParameter] private Task<AuthenticationState> authenticationState { get; set; } = default!;
+    private string TenUser = "…";          // mặc định
 
     protected override async Task OnInitializedAsync()
     {
-        @* var state = await authStateProvider.GetAuthenticationStateAsync();
-        if (!(state.User?.Identity?.IsAuthenticated ?? false))
+        var state = await AuthStateProvider.GetAuthenticationStateAsync();
+        var user  = state.User;
+
+        // 1) Lấy Id nhân viên từ claim (bạn đặt sẵn khi login)
+        if (int.TryParse(user.FindFirst("IdNhanVien")?.Value, out var maNV))
         {
-            UriHelper.NavigateTo("/qlkho/login");
-        } *@
-
-    }
-
-    protected void navigateMenu(string Path)
-    {
-
-        UriHelper.NavigateTo(Path);
+            // 2) Truy bảng NhanVien lấy tên
+            TenUser = await db.NhanViens
+                                  .Where(n => n.MaNV == maNV)
+                                  .Select(n => n.TenNV)
+                                  .FirstOrDefaultAsync()
+                          ?? user.Identity?.Name               // fallback
+                          ?? "Admin";
+        }
+        else
+        {
+            // fallback nếu claim không có
+            TenUser = user.Identity?.Name ?? "Admin";
+        }
     }
 }
-

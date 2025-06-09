@@ -13,7 +13,7 @@
                         <Start><RadzenIcon Icon="account_circle"/></Start>
                         <ChildContent>
                             <RadzenTextBox @bind-Value="NguoiDung.Username"
-                                        Disabled="@( !isNew )" />   <!-- khoá khi đã có -->
+                                        Disabled="false" />   <!-- khoá khi đã có -->
                         </ChildContent>
                     </RadzenFormField>
                 </div>
@@ -135,7 +135,7 @@
                 // KHÔNG động tới Password hay Username nữa
                 db.NguoiDungs.Update(NguoiDung);
                 db.Entry(NguoiDung).Property(x => x.Password).IsModified = false;
-                db.Entry(NguoiDung).Property(x => x.Username).IsModified = false;
+                //db.Entry(NguoiDung).Property(x => x.Username).IsModified = false;
             }
 
             await db.SaveChangesAsync();            // => IdNguoiDung mới đã có
